@@ -1,0 +1,6 @@
+.vscode/
+build/
+*.sln
+*.vcxproj*
+CMakeCache.txt
+cmake_install.cmake
