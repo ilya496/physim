@@ -49,7 +49,7 @@ include_directories(
 # ----------------------------
 # Application
 # ----------------------------
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp Shader.cpp)
 
 # Link everything together
 target_link_libraries(${PROJECT_NAME}
