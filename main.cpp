@@ -49,6 +49,8 @@ int main()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", 32.0f);
+
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
@@ -213,34 +215,11 @@ void main()
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    int fboWidth = 800, fboHeight = 600;
+
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-        glEnable(GL_DEPTH_TEST);
-        glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glUseProgram(shaderProgram);
-
-        glm::mat4 model = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.3f, 1.0f, 0.2f));
-        glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -3.0f));
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-
-        GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-        GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-        GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
-
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projection[0][0]);
-
-        glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -307,10 +286,61 @@ void main()
 
         ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
 
-        // Optional: resize framebuffer when ImGui panel resizes
-        // (you can implement this later)
+        int desiredWidth = (int)(viewportPanelSize.x * io.DisplayFramebufferScale.x);
+        int desiredHeight = (int)(viewportPanelSize.y * io.DisplayFramebufferScale.y);
 
-        ImGui::Image((void *)(intptr_t)textureColorBuffer, viewportPanelSize, ImVec2(0, 1), ImVec2(1, 0));
+        desiredWidth = std::max(1, desiredWidth);
+        desiredHeight = std::max(1, desiredHeight);
+
+        if (desiredWidth != fboWidth || desiredHeight != fboHeight)
+        {
+            fboWidth = desiredWidth;
+            fboHeight = desiredHeight;
+
+            glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, fboWidth, fboHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+
+            glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fboWidth, fboHeight);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+                std::cerr << "Resized framebuffer not complete!" << std::endl;
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glViewport(0, 0, fboWidth, fboHeight);
+        glEnable(GL_DEPTH_TEST);
+        glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glUseProgram(shaderProgram);
+
+        glm::mat4 model = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.3f, 1.0f, 0.2f));
+        glm::mat4 view = glm::lookAt(
+            glm::vec3(0.0f, 0.0f, 3.0f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), float(fboWidth) / float(fboHeight), 0.1f, 100.0f);
+
+        GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+        GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+        GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projection[0][0]);
+
+        glBindVertexArray(cubeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        ImGui::Image((void *)(intptr_t)textureColorBuffer, ImVec2((float)fboWidth, (float)fboHeight), ImVec2(0, 1), ImVec2(1, 0));
 
         ImGui::End();
         ImGui::PopStyleVar();

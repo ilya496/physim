@@ -5,11 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ----------------------------
-# GLFW (precompiled)
+# GLFW (build from source)
 # ----------------------------
 set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/libs/glfw")
+add_subdirectory(${GLFW_ROOT})
 include_directories("${GLFW_ROOT}/include")
-link_directories("${GLFW_ROOT}/lib-vc2022")
 
 # ----------------------------
 # GLAD (build from source)
@@ -51,11 +51,30 @@ include_directories(
 # ----------------------------
 add_executable(${PROJECT_NAME} main.cpp Shader.cpp)
 
-# Link everything together
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-        imgui
-        glad
-        glfw3
-        opengl32
-)
+# ----------------------------
+# Platform-specific linkage
+# ----------------------------
+if (WIN32)
+    message(STATUS "Configuring for Windows...")
+
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+            imgui
+            glad
+            glfw
+            opengl32
+    )
+
+elseif(UNIX AND NOT APPLE)
+    message(STATUS "Configuring for Linux...")
+
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+            imgui
+            glad
+            glfw
+            GL
+            pthread
+            dl
+    )
+endif()
