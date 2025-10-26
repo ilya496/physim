@@ -80,7 +80,14 @@ int main()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", 32.0f);
+    float xscale, yscale;
+    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+    glfwGetMonitorContentScale(monitor, &xscale, &yscale);
+
+    float baseFontSize = 16.0f;
+    float fontSize = baseFontSize * xscale;
+
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", fontSize);
 
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
