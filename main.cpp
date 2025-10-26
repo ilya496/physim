@@ -8,12 +8,41 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
+#include "Camera.h"
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
     // FIXME: Introduce rendering on a separate thread
 }
+
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
+    {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+}
+
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+
+// settings
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
+
+// camera
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
+
+// timing
+float deltaTime = 0.0f; // time between current frame and last frame
+float lastFrame = 0.0f;
 
 int main()
 {
@@ -33,6 +62,8 @@ int main()
     glfwSwapInterval(1);
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -192,6 +223,73 @@ void main()
 
     glBindVertexArray(0);
 
+    float axesVertices[] = {
+        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+        1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+
+        // Y-axis (green)
+        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+
+        // Z-axis (blue)
+        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
+        0.7071f, -0.7071f, 0.0f, 0.0f, 0.0f, 1.0f};
+
+    GLuint axesVao, axesVbo;
+    glGenVertexArrays(1, &axesVao);
+    glGenBuffers(1, &axesVbo);
+
+    glBindVertexArray(axesVao);
+    glBindBuffer(GL_ARRAY_BUFFER, axesVbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(axesVertices), axesVertices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    const char *axesVertexShaderSource = R"(
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+out vec3 ourColor;
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+void main() {
+    gl_Position = projection * view * model * vec4(aPos * 2, 1.0);
+    ourColor = aColor;
+}
+)";
+
+    const char *axesFragmentShaderSource = R"(
+#version 330 core
+in vec3 ourColor;
+out vec4 FragColor;
+void main() {
+    FragColor = vec4(ourColor, 1.0);
+}
+)";
+
+    glLineWidth(3.0f);
+
+    GLuint axesVertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(axesVertexShader, 1, &axesVertexShaderSource, NULL);
+    glCompileShader(axesVertexShader);
+
+    GLuint axesFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(axesFragmentShader, 1, &axesFragmentShaderSource, NULL);
+    glCompileShader(axesFragmentShader);
+
+    GLuint axesShaderProgram = glCreateProgram();
+    glAttachShader(axesShaderProgram, axesVertexShader);
+    glAttachShader(axesShaderProgram, axesFragmentShader);
+    glLinkProgram(axesShaderProgram);
+
+    glDeleteShader(axesVertexShader);
+    glDeleteShader(axesFragmentShader);
+
     unsigned int framebuffer;
     glGenFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
@@ -320,11 +418,9 @@ void main()
 
         glUseProgram(shaderProgram);
 
-        glm::mat4 model = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.3f, 1.0f, 0.2f));
-        glm::mat4 view = glm::lookAt(
-            glm::vec3(0.0f, 0.0f, 3.0f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 model = glm::rotate(glm::mat4(1.0f), 0.0f, glm::vec3(0.3f, 1.0f, 0.2f));
+        // glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 projection = glm::perspective(glm::radians(45.0f), float(fboWidth) / float(fboHeight), 0.1f, 100.0f);
 
         GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
@@ -337,6 +433,20 @@ void main()
 
         glBindVertexArray(cubeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+
+        glBindVertexArray(axesVao);
+        glUseProgram(axesShaderProgram);
+
+        glm::mat4 axesModel(1.0f);
+        GLint axesModelLoc = glGetUniformLocation(shaderProgram, "model");
+
+        glUniformMatrix4fv(axesModelLoc, 1, GL_FALSE, &axesModel[0][0]);
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projection[0][0]);
+
+        glDrawArrays(GL_LINES, 0, 6);
+
         glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -379,4 +489,25 @@ void main()
 
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
+{
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
+
+    if (firstMouse)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos;
+
+    lastX = xpos;
+    lastY = ypos;
+
+    camera.ProcessMouseMovement(xoffset, yoffset);
 }
