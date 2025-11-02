@@ -6,43 +6,280 @@
 #include "Shader.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #include <iostream>
 #include "Camera.h"
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height)
+struct Particle {
+    glm::vec3 position;
+    glm::vec3 velocity;
+    float life;
+};
+
+class ParticleSystem {
+public:
+    virtual ~ParticleSystem() {}
+    virtual void Update(float dt) = 0;
+    virtual void Render(const glm::mat4& view, const glm::mat4& projection) = 0;
+    virtual void ResetParticle(Particle& p) = 0;
+    virtual void ImGuiControls() = 0;
+
+protected:
+    std::vector<Particle> particles;
+    unsigned int VAO = 0, VBO = 0;
+    glm::vec3 emitterPos = glm::vec3(0.0f);
+    float emissionRate = 100.0f;
+    float particleLife = 3.0f;
+    float particleSpeed = 2.0f;
+    float gravity = -9.8f;
+    unsigned int maxParticles = 1000;
+    float particleSize = 0.2f;
+};
+
+class PointParticleSystem : public ParticleSystem {
+public:
+    PointParticleSystem() {
+        particles.resize(maxParticles);
+
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, maxParticles * sizeof(glm::vec3), nullptr, GL_STREAM_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+
+        shader = new Shader("../shaders/particle.vert", "../shaders/particle.frag");
+    }
+
+    ~PointParticleSystem() override {
+        delete shader;
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+    }
+
+    void Update(float dt) override {
+        int newParticles = static_cast<int>(emissionRate * dt);
+        for (int i = 0; i < maxParticles && newParticles > 0; i++) {
+            if (particles[i].life <= 0.0f) {
+                ResetParticle(particles[i]);
+                newParticles--;
+            }
+        }
+
+        for (auto& p : particles) {
+            if (p.life > 0.0f) {
+                p.life -= dt;
+                p.velocity.y += gravity * dt * 0.2f;
+                p.position += p.velocity * dt;
+            }
+        }
+    }
+
+    void Render(const glm::mat4& view, const glm::mat4& projection) override {
+        shader->Bind();
+        shader->SetMat4f("u_View", view);
+        shader->SetMat4f("u_Projection", projection);
+        shader->Set1f("u_PointSize", 8.0f);
+        shader->SetVec4f("u_Color", glm::vec4(1.0f, 0.8f, 0.2f, 1.0f));
+
+        std::vector<glm::vec3> positions;
+        positions.reserve(maxParticles);
+        for (const auto& p : particles)
+            if (p.life > 0.0f)
+                positions.push_back(p.position);
+
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, positions.size() * sizeof(glm::vec3), positions.data());
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_POINTS, 0, positions.size());
+        glBindVertexArray(0);
+    }
+
+    void ResetParticle(Particle& p) override {
+        p.position = emitterPos;
+        p.velocity = glm::vec3(
+            ((rand() % 100) / 100.0f - 0.5f) * particleSpeed,
+            (rand() % 100) / 100.0f * particleSpeed,
+            ((rand() % 100) / 100.0f - 0.5f) * particleSpeed
+        );
+        p.life = particleLife;
+    }
+
+    void ImGuiControls() override {
+        ImGui::Text("Point Particle System");
+        ImGui::SliderFloat3("Emitter Position", glm::value_ptr(emitterPos), -5.0f, 5.0f);
+        ImGui::SliderFloat("Emission Rate", &emissionRate, 0.0f, 1000.0f);
+        ImGui::SliderFloat("Speed", &particleSpeed, 0.1f, 10.0f);
+        ImGui::SliderFloat("Lifetime", &particleLife, 0.1f, 10.0f);
+        ImGui::SliderFloat("Gravity", &gravity, -20.0f, 0.0f);
+    }
+
+private:
+    Shader* shader;
+};
+
+class BillboardParticleSystem : public ParticleSystem {
+public:
+    BillboardParticleSystem() {
+        particles.resize(maxParticles);
+
+        float quadVertices[] = {
+            // positions   // texcoords
+            -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+             0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+             0.5f,  0.5f, 0.0f, 1.0f, 1.0f,
+            -0.5f,  0.5f, 0.0f, 0.0f, 1.0f
+        };
+        unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
+
+        glGenVertexArrays(1, &VAO);
+        glGenBuffers(1, &VBO);
+        glGenBuffers(1, &EBO);
+        glBindVertexArray(VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, VBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        glBindVertexArray(0);
+
+        shader = new Shader("../shaders/particle_billboard.vert", "../shaders/particle_billboard.frag");
+
+        // Load texture
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        stbi_set_flip_vertically_on_load(true);
+        int w, h, ch;
+        unsigned char* data = stbi_load("../smoke.png", &w, &h, &ch, 4);
+        if (data) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+            glGenerateMipmap(GL_TEXTURE_2D);
+        }
+        stbi_image_free(data);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+
+    ~BillboardParticleSystem() override {
+        delete shader;
+        glDeleteVertexArrays(1, &VAO);
+        glDeleteBuffers(1, &VBO);
+        glDeleteBuffers(1, &EBO);
+    }
+
+    void Update(float dt) override {
+        int newParticles = static_cast<int>(emissionRate * dt);
+        for (int i = 0; i < maxParticles && newParticles > 0; i++) {
+            if (particles[i].life <= 0.0f) {
+                ResetParticle(particles[i]);
+                newParticles--;
+            }
+        }
+
+        for (auto& p : particles) {
+            if (p.life > 0.0f) {
+                p.life -= dt;
+                p.velocity.y += gravity * dt * 0.2f;
+                p.position += p.velocity * dt;
+            }
+        }
+    }
+
+    void Render(const glm::mat4& view, const glm::mat4& projection) override {
+        shader->Bind();
+        shader->SetMat4f("u_View", view);
+        shader->SetMat4f("u_Projection", projection);
+        shader->Set1i("u_Texture", 0);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+
+        glBindVertexArray(VAO);
+        for (const auto& p : particles) {
+            if (p.life <= 0.0f) continue;
+
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), p.position);
+            model = glm::scale(model, glm::vec3(particleSize));
+
+            // extract camera right/up vectors from view
+            glm::vec3 right = glm::vec3(view[0][0], view[1][0], view[2][0]);
+            glm::vec3 up = glm::vec3(view[0][1], view[1][1], view[2][1]);
+            glm::mat4 billboard = glm::mat4(
+                glm::vec4(right, 0.0f),
+                glm::vec4(up, 0.0f),
+                glm::vec4(glm::cross(right, up), 0.0f),
+                glm::vec4(0, 0, 0, 1)
+            );
+
+            model *= billboard;
+            shader->SetMat4f("u_Model", model);
+            shader->Set1f("u_Alpha", p.life / particleLife);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        }
+        glBindVertexArray(0);
+    }
+
+    void ResetParticle(Particle& p) override {
+        p.position = emitterPos;
+        p.velocity = glm::vec3(
+            ((rand() % 100) / 100.0f - 0.5f) * particleSpeed,
+            (rand() % 100) / 100.0f * particleSpeed,
+            ((rand() % 100) / 100.0f - 0.5f) * particleSpeed
+        );
+        p.life = particleLife;
+    }
+
+    void ImGuiControls() override {
+        ImGui::Text("Billboard Particle System");
+        ImGui::SliderFloat3("Emitter Position", glm::value_ptr(emitterPos), -5.0f, 5.0f);
+        ImGui::SliderFloat("Emission Rate", &emissionRate, 0.0f, 1000.0f);
+        ImGui::SliderFloat("Speed", &particleSpeed, 0.1f, 10.0f);
+        ImGui::SliderFloat("Lifetime", &particleLife, 0.1f, 10.0f);
+        ImGui::SliderFloat("Gravity", &gravity, -20.0f, 0.0f);
+        ImGui::SliderFloat("Particle Size", &particleSize, 0.01f, 1.0f, "%.3f");
+    }
+
+private:
+    Shader* shader;
+    unsigned int EBO;
+    unsigned int texture;
+};
+
+
+void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
     // FIXME: Introduce rendering on a separate thread
 }
 
-void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
-{
-    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
-    {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    }
-    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE)
-    {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    }
-}
-
-void mouse_callback(GLFWwindow *window, double xpos, double ypos);
-
-// settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
-
-// camera
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
 
-// timing
-float deltaTime = 0.0f; // time between current frame and last frame
-float lastFrame = 0.0f;
+const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
+
+void RenderScene(const Shader& shader, unsigned int cubeVAO, unsigned int planeVAO)
+{
+    // Cube
+    glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    shader.SetMat4f("u_Model", model);
+    glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    // Floor
+    model = glm::mat4(1.0f);
+    shader.SetMat4f("u_Model", model);
+    glBindVertexArray(planeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
 
 int main()
 {
@@ -55,161 +292,97 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow *window = glfwCreateWindow(800, 600, "ImGui + GLFW + GLAD", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(800, 600, "ImGui + GLFW + GLAD", nullptr, nullptr);
     if (!window)
         return -1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, [](GLFWwindow* w, double xpos, double ypos)
+        { camera.HandleMouseMovement(w, xpos, ypos); });
+
+    glfwSetScrollCallback(window, [](GLFWwindow* w, double xoffset, double yoffset)
+        { camera.HandleScroll(xoffset, yoffset); });
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
         std::cerr << "Failed to initialize GLAD\n";
         return -1;
     }
+
     glViewport(0, 0, 800, 600);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
+    ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    float xscale, yscale;
-    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-    glfwGetMonitorContentScale(monitor, &xscale, &yscale);
-
-    float baseFontSize = 16.0f;
-    float fontSize = baseFontSize * xscale;
-
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", fontSize);
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", 16.0f);
 
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
-    const char *vertexShaderSource = R"(
-#version 460 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal;
-layout (location = 2) in vec2 aTexCoords;
+    float cubeVertices[] = {
+        // Back face (z = -0.5) — normal (0, 0, -1)
+         0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 1.0f,
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+         0.5f, -0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 0.0f,
+        -0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   0.0f, 1.0f,
+         0.5f,  0.5f, -0.5f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
 
-out vec3 FragPos;
-out vec3 Normal;
+         // Front face (z = +0.5) — normal (0, 0, 1)
+         -0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 0.0f,
+          0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 0.0f,
+          0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 1.0f,
 
-void main()
-{
-    FragPos = vec3(model * vec4(aPos, 1.0));
-    Normal = mat3(transpose(inverse(model))) * aNormal;
-    gl_Position = projection * view * vec4(FragPos, 1.0);
-}
-)";
+         -0.5f, -0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 0.0f,
+          0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   1.0f, 1.0f,
+         -0.5f,  0.5f,  0.5f,   0.0f,  0.0f,  1.0f,   0.0f, 1.0f,
 
-    const char *fragmentShaderSource = R"(
-#version 460 core
-out vec4 FragColor;
+         // Left face (x = -0.5) — normal (-1, 0, 0)
+         -0.5f, -0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
+         -0.5f, -0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 0.0f,
+         -0.5f,  0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
 
-in vec3 Normal;
-in vec3 FragPos;
+         -0.5f, -0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
+         -0.5f,  0.5f,  0.5f,  -1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
+         -0.5f,  0.5f, -0.5f,  -1.0f,  0.0f,  0.0f,   0.0f, 1.0f,
 
-void main()
-{
-    vec3 lightDir = normalize(vec3(0.3, 0.5, 0.8));
-    float diff = max(dot(normalize(Normal), lightDir), 0.0);
-    vec3 color = vec3(0.2, 0.6, 1.0) * diff + vec3(0.1);
-    FragColor = vec4(color, 1.0);
-}
-)";
+         // Right face (x = +0.5) — normal (1, 0, 0)
+          0.5f, -0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
+          0.5f, -0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 0.0f,
+          0.5f,  0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
 
-    auto compileShader = [](GLenum type, const char *src) -> GLuint
-    {
-        GLuint shader = glCreateShader(type);
-        glShaderSource(shader, 1, &src, nullptr);
-        glCompileShader(shader);
+          0.5f, -0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 0.0f,
+          0.5f,  0.5f, -0.5f,   1.0f,  0.0f,  0.0f,   1.0f, 1.0f,
+          0.5f,  0.5f,  0.5f,   1.0f,  0.0f,  0.0f,   0.0f, 1.0f,
 
-        GLint success;
-        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            char infoLog[512];
-            glGetShaderInfoLog(shader, 512, nullptr, infoLog);
-            std::cerr << "Shader compile error: " << infoLog << std::endl;
-        }
-        return shader;
+          // Bottom face (y = -0.5) — normal (0, -1, 0)
+          -0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 1.0f,
+           0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 1.0f,
+           0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 0.0f,
+
+          -0.5f, -0.5f, -0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 1.0f,
+           0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   1.0f, 0.0f,
+          -0.5f, -0.5f,  0.5f,   0.0f, -1.0f,  0.0f,   0.0f, 0.0f,
+
+          // Top face (y = +0.5) — normal (0, 1, 0)
+          -0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 1.0f,
+           0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 0.0f,
+           0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 1.0f,
+
+          -0.5f,  0.5f, -0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 1.0f,
+          -0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   0.0f, 0.0f,
+           0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 0.0f
     };
 
-    GLuint vertexShader = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
-
-    GLuint shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    GLint success;
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        char infoLog[512];
-        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-        std::cerr << "Shader linking failed: " << infoLog << std::endl;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    float cubeVertices[] = {
-        // positions          // normals        // texcoords
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
-        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f,
-        -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f,
-
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f,
-        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-
-        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f,
-        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-
-        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f,
-
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f,
-        0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f,
-        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f};
 
     unsigned int cubeVAO, cubeVBO;
     glGenVertexArrays(1, &cubeVAO);
@@ -219,269 +392,241 @@ void main()
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
 
     // Positions
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     // Normals
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     // TexCoords
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
 
-    float axesVertices[] = {
-        0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-        1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+    float planeVertices[] = {
+        // positions             // normals          // texcoords
+        -10.0f, -0.5f,  10.0f,     0.0f, 1.0f, 0.0f,   0.0f, 0.0f,
+         10.0f, -0.5f,  10.0f,     0.0f, 1.0f, 0.0f,   10.0f, 0.0f,
+         10.0f, -0.5f, -10.0f,     0.0f, 1.0f, 0.0f,   10.0f, 10.0f,
 
-        // Y-axis (green)
-        0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f,
+        -10.0f, -0.5f,  10.0f,     0.0f, 1.0f, 0.0f,   0.0f, 0.0f,
+         10.0f, -0.5f, -10.0f,     0.0f, 1.0f, 0.0f,   10.0f, 10.0f,
+        -10.0f, -0.5f, -10.0f,     0.0f, 1.0f, 0.0f,   0.0f, 10.0f
+    };
 
-        // Z-axis (blue)
-        0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
-        0.7071f, -0.7071f, 0.0f, 0.0f, 0.0f, 1.0f};
+    unsigned int planeVAO, planeVBO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
 
-    GLuint axesVao, axesVbo;
-    glGenVertexArrays(1, &axesVao);
-    glGenBuffers(1, &axesVbo);
-
-    glBindVertexArray(axesVao);
-    glBindBuffer(GL_ARRAY_BUFFER, axesVbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(axesVertices), axesVertices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
 
-    const char *axesVertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aColor;
-out vec3 ourColor;
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * view * model * vec4(aPos * 2, 1.0);
-    ourColor = aColor;
-}
-)";
+    unsigned int depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
 
-    const char *axesFragmentShaderSource = R"(
-#version 330 core
-in vec3 ourColor;
-out vec4 FragColor;
-void main() {
-    FragColor = vec4(ourColor, 1.0);
-}
-)";
+    // Create depth texture
+    unsigned int depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+        SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    // set border color to 1.0 so fragments outside are considered lit
+    float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-    glLineWidth(3.0f);
-
-    GLuint axesVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(axesVertexShader, 1, &axesVertexShaderSource, NULL);
-    glCompileShader(axesVertexShader);
-
-    GLuint axesFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(axesFragmentShader, 1, &axesFragmentShaderSource, NULL);
-    glCompileShader(axesFragmentShader);
-
-    GLuint axesShaderProgram = glCreateProgram();
-    glAttachShader(axesShaderProgram, axesVertexShader);
-    glAttachShader(axesShaderProgram, axesFragmentShader);
-    glLinkProgram(axesShaderProgram);
-
-    glDeleteShader(axesVertexShader);
-    glDeleteShader(axesFragmentShader);
-
-    unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-
-    unsigned int textureColorBuffer;
-    glGenTextures(1, &textureColorBuffer);
-    glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 800, 600, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
-
-    unsigned int rbo;
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 800, 600);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
+    // attach depth texture as FBO's depth buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    // no color buffer is drawn
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-
+        std::cerr << "ERROR::FRAMEBUFFER:: Depth framebuffer not complete!\n";
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    int fboWidth = 800, fboHeight = 600;
+    Shader shader("../shaders/default.vert", "../shaders/default.frag");
+    Shader depthShader("../shaders/depth.vert", "../shaders/depth.frag");
+
+    shader.Bind();
+    shader.Set1i("shadowMap", 1);
+
+    glm::vec3 lightPos = glm::vec3(1.2f, 1.0f, 2.0f);
+    glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    glm::vec3 materialAmbient = glm::vec3(1.0f, 0.5f, 0.31f);
+    glm::vec3 materialDiffuse = glm::vec3(1.0f, 0.5f, 0.31f);
+    glm::vec3 materialSpecular = glm::vec3(0.5f, 0.5f, 0.5f);
+    float materialShininess = 32.0f;
+
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    stbi_set_flip_vertically_on_load(true);
+    int width, height, channels;
+    unsigned char* data = stbi_load("../brickwall.jpg", &width, &height, &channels, 0);
+    if (!data)
+    {
+        std::cerr << "Failed to load image" << '\n';
+    }
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(data);
+    shader.Set1i("u_Texture", 0);
+
+    unsigned int normalMap;
+    glGenTextures(1, &normalMap);
+    glBindTexture(GL_TEXTURE_2D, normalMap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    int normalWidth, normalHeight, normalChannels;
+    unsigned char* normalData = stbi_load("../brickwall_normal.jpg", &normalWidth, &normalHeight, &normalChannels, 0);
+    if (!normalData)
+    {
+        std::cerr << "Failed to load normal map" << '\n';
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, normalWidth, normalHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, normalData);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    stbi_image_free(normalData);
+    shader.Set1i("u_NormalMap", 2);
+
+    // -------------------- PARTICLE SYSTEM SETUP --------------------
+    ParticleSystem* particleSystem = nullptr;
+    PointParticleSystem pointParticles;
+    BillboardParticleSystem billboardParticles;
+    particleSystem = &pointParticles;
+    int currentSystem = 0; // 0 = points, 1 = billboard
+
+    float deltaTime = 0.016f;
+    float lastFrame = 0.0f;
 
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
 
+        float currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        static bool opt_fullscreen = true;
-        static bool opt_padding = false;
-        static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+        ImGui::Begin("Lighting Controls");
 
-        ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-        if (opt_fullscreen)
+        ImGui::Text("Light Settings");
+        ImGui::Separator();
+        if (ImGui::CollapsingHeader("Light"))
         {
-            const ImGuiViewport *viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(viewport->WorkPos);
-            ImGui::SetNextWindowSize(viewport->WorkSize);
-            ImGui::SetNextWindowViewport(viewport->ID);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-            window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-            window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+            ImGui::SliderFloat3("Position", glm::value_ptr(lightPos), -10.0f, 10.0f);
+            ImGui::ColorEdit3("Color", glm::value_ptr(lightColor));
         }
 
-        if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
-            window_flags |= ImGuiWindowFlags_NoBackground;
-
-        if (!opt_padding)
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-
-        // Create a fullscreen window for the dockspace
-        ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-
-        if (!opt_padding)
-            ImGui::PopStyleVar();
-
-        if (opt_fullscreen)
-            ImGui::PopStyleVar(2);
-
-        // DockSpace ID
-        ImGuiIO &io = ImGui::GetIO();
-        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
+        if (ImGui::CollapsingHeader("Material"))
         {
-            ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-            ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+            ImGui::ColorEdit3("Ambient", glm::value_ptr(materialAmbient));
+            ImGui::ColorEdit3("Diffuse", glm::value_ptr(materialDiffuse));
+            ImGui::ColorEdit3("Specular", glm::value_ptr(materialSpecular));
+            ImGui::SliderFloat("Shininess", &materialShininess, 1.0f, 128.0f);
         }
 
-        if (ImGui::BeginMenuBar())
+        if (ImGui::CollapsingHeader("Particle Systems"))
         {
-            if (ImGui::BeginMenu("File"))
-            {
-                if (ImGui::MenuItem("About"))
-                {
-                }
-                if (ImGui::MenuItem("Exit"))
-                {
-                    glfwSetWindowShouldClose(window, true);
-                }
-                ImGui::EndMenu();
+            ImGui::Text("Select System:");
+            const char* systems[] = { "Points", "Billboards" };
+            if (ImGui::Combo("Type", &currentSystem, systems, 2)) {
+                particleSystem = (currentSystem == 0) ? (ParticleSystem*)&pointParticles : (ParticleSystem*)&billboardParticles;
             }
-            ImGui::EndMenuBar();
+
+            particleSystem->ImGuiControls();
         }
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::Begin("Viewport");
+        ImGui::End();
 
-        ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
-
-        int desiredWidth = (int)(viewportPanelSize.x * io.DisplayFramebufferScale.x);
-        int desiredHeight = (int)(viewportPanelSize.y * io.DisplayFramebufferScale.y);
-
-        desiredWidth = std::max(1, desiredWidth);
-        desiredHeight = std::max(1, desiredHeight);
-
-        if (desiredWidth != fboWidth || desiredHeight != fboHeight)
-        {
-            fboWidth = desiredWidth;
-            fboHeight = desiredHeight;
-
-            glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, fboWidth, fboHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-
-            glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, fboWidth, fboHeight);
-
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-                std::cerr << "Resized framebuffer not complete!" << std::endl;
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-        glViewport(0, 0, fboWidth, fboHeight);
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_FRONT);
         glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glUseProgram(shaderProgram);
+        float near_plane = 1.0f, far_plane = 20.0f;
+        float orthoSize = 10.0f;
+        glm::mat4 lightProjection = glm::ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, near_plane, far_plane);
+        glm::mat4 lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
-        glm::mat4 model = glm::rotate(glm::mat4(1.0f), 0.0f, glm::vec3(0.3f, 1.0f, 0.2f));
-        // glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), float(fboWidth) / float(fboHeight), 0.1f, 100.0f);
+        depthShader.Bind();
+        depthShader.SetMat4f("u_LightSpaceMatrix", lightSpaceMatrix);
 
-        GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-        GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-        GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
 
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &model[0][0]);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projection[0][0]);
+        glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        depthShader.SetMat4f("u_Model", model);
+        RenderScene(depthShader, cubeVAO, planeVAO);
 
-        glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-
-        glBindVertexArray(axesVao);
-        glUseProgram(axesShaderProgram);
-
-        glm::mat4 axesModel(1.0f);
-        GLint axesModelLoc = glGetUniformLocation(shaderProgram, "model");
-
-        glUniformMatrix4fv(axesModelLoc, 1, GL_FALSE, &axesModel[0][0]);
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projection[0][0]);
-
-        glDrawArrays(GL_LINES, 0, 6);
-
-        glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        ImGui::Image((void *)(intptr_t)textureColorBuffer, ImVec2((float)fboWidth, (float)fboHeight), ImVec2(0, 1), ImVec2(1, 0));
+        // restore viewport for screen
+        glViewport(0, 0, 800, 600); // or use your window size variables
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glCullFace(GL_BACK);
 
-        ImGui::End();
-        ImGui::PopStyleVar();
+        // glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+        glm::mat4 normal = glm::transpose(glm::inverse(model));
 
-        bool my_tool_active = true;
-        static float my_color[4] = {0.4f, 0.7f, 0.0f, 1.0f};
+        shader.Bind();
+        shader.SetMat4f("u_Model", model);
+        shader.SetMat4f("u_View", view);
+        shader.SetMat4f("u_Projection", projection);
+        shader.SetMat4f("u_Normal", normal);
+        shader.SetMat4f("u_LightSpaceMatrix", lightSpaceMatrix);
 
-        ImGui::Begin("My First Tool", &my_tool_active);
+        shader.SetVec3f("u_LightPos", lightPos);
+        shader.SetVec3f("u_ViewPos", camera.Position);
+        shader.SetVec3f("u_LightColor", lightColor);
 
-        ImGui::ColorEdit4("Color", my_color);
+        shader.SetVec3f("material.ambient", materialAmbient);
+        shader.SetVec3f("material.diffuse", materialDiffuse);
+        shader.SetVec3f("material.specular", materialSpecular);
+        shader.Set1f("material.shininess", materialShininess);
 
-        float samples[100];
-        for (int n = 0; n < 100; n++)
-            samples[n] = sinf(n * 0.2f + static_cast<float>(ImGui::GetTime()) * 1.5f);
-        ImGui::PlotLines("Samples", samples, 100);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, depthMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, normalMap);
 
-        ImGui::TextColored(ImVec4(1, 1, 0, 1), "Important Stuff");
-        ImGui::BeginChild("Scrolling");
-        for (int n = 0; n < 50; n++)
-            ImGui::Text("%04d: Some text", n);
-        ImGui::EndChild();
-        ImGui::End();
+        // glBindVertexArray(cubeVAO);
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        RenderScene(shader, cubeVAO, planeVAO);
 
-        ImGui::End(); // End DockSpace window
+        particleSystem->Update(deltaTime);
+        particleSystem->Render(view, projection);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -489,32 +634,10 @@ void main() {
         glfwSwapBuffers(window);
     }
 
-    // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
     glfwDestroyWindow(window);
     glfwTerminate();
-}
-
-void mouse_callback(GLFWwindow *window, double xposIn, double yposIn)
-{
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
-
-    if (firstMouse)
-    {
-        lastX = xpos;
-        lastY = ypos;
-        firstMouse = false;
-    }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos;
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
 }
