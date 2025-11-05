@@ -57,15 +57,17 @@ float ShadowCalculation(vec4 fragPosLightSpace)
 
 void main() {
     // ambient
-    vec3 ambient = u_LightColor * material.ambient * vec3(texture(u_Texture, v_TexCoords));
+    // vec3 ambient = u_LightColor * material.ambient * vec3(texture(u_Texture, v_TexCoords));
+    vec3 ambient = u_LightColor * material.ambient;
 
     // diffuse 
-    // vec3 norm = normalize(v_Normal);
-    vec3 norm = texture(u_NormalMap, v_TexCoords).rgb;
-    norm = normalize(norm * 2.0 - 1.0);
+    vec3 norm = normalize(v_Normal);
+    // vec3 norm = texture(u_NormalMap, v_TexCoords).rgb;
+    // norm = normalize(norm * 2.0 - 1.0);
     vec3 lightDir = normalize(u_LightPos - v_FragPos);
     float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = u_LightColor * (diff * material.diffuse) * vec3(texture(u_Texture, v_TexCoords));
+    vec3 diffuse = u_LightColor * (diff * material.diffuse);
+    // vec3 diffuse = u_LightColor * (diff * material.diffuse) * vec3(texture(u_Texture, v_TexCoords));
     
     // specular
     vec3 viewDir = normalize(u_ViewPos - v_FragPos);

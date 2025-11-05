@@ -47,34 +47,31 @@ include_directories(
 )
 
 # ----------------------------
+# Assimp (build from source using FetchContent)
+# ----------------------------
+include(FetchContent)
+FetchContent_Declare(
+  assimp
+  GIT_REPOSITORY https://github.com/assimp/assimp.git
+  GIT_TAG        master # You can pin to a version, e.g., "v5.3.1"
+)
+FetchContent_MakeAvailable(assimp)
+
+# ----------------------------
 # Application
 # ----------------------------
-add_executable(${PROJECT_NAME} main.cpp Shader.cpp)
+add_executable(${PROJECT_NAME}
+    main.cpp
+    Shader.cpp
+    Model.cpp
+)
 
-# ----------------------------
-# Platform-specific linkage
-# ----------------------------
-if (WIN32)
-    message(STATUS "Configuring for Windows...")
 
-    target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-            imgui
-            glad
-            glfw
-            opengl32
-    )
-
-elseif(UNIX AND NOT APPLE)
-    message(STATUS "Configuring for Linux...")
-
-    target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-            imgui
-            glad
-            glfw
-            GL
-            pthread
-            dl
-    )
-endif()
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
+        imgui
+        glad
+        glfw
+        assimp
+        opengl32
+)
