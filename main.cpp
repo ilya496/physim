@@ -7,122 +7,18 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/norm.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #include <iostream>
+#include <algorithm>
 #include "Camera.h"
+#include "ParticleSystem.h"
 
-struct Particle {
-    glm::vec3 position;
-    glm::vec3 velocity;
-    float life;
-};
-
-class ParticleSystem {
-public:
-    virtual ~ParticleSystem() {}
-    virtual void Update(float dt) = 0;
-    virtual void Render(const glm::mat4& view, const glm::mat4& projection) = 0;
-    virtual void ResetParticle(Particle& p) = 0;
-    virtual void ImGuiControls() = 0;
-
-protected:
-    std::vector<Particle> particles;
-    unsigned int VAO = 0, VBO = 0;
-    glm::vec3 emitterPos = glm::vec3(0.0f);
-    float emissionRate = 100.0f;
-    float particleLife = 3.0f;
-    float particleSpeed = 2.0f;
-    float gravity = -9.8f;
-    unsigned int maxParticles = 1000;
-    float particleSize = 0.2f;
-};
-
-class PointParticleSystem : public ParticleSystem {
-public:
-    PointParticleSystem() {
-        particles.resize(maxParticles);
-
-        glGenVertexArrays(1, &VAO);
-        glGenBuffers(1, &VBO);
-        glBindVertexArray(VAO);
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferData(GL_ARRAY_BUFFER, maxParticles * sizeof(glm::vec3), nullptr, GL_STREAM_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
-        glEnableVertexAttribArray(0);
-        glBindVertexArray(0);
-
-        shader = new Shader("../shaders/particle.vert", "../shaders/particle.frag");
-    }
-
-    ~PointParticleSystem() override {
-        delete shader;
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-    }
-
-    void Update(float dt) override {
-        int newParticles = static_cast<int>(emissionRate * dt);
-        for (int i = 0; i < maxParticles && newParticles > 0; i++) {
-            if (particles[i].life <= 0.0f) {
-                ResetParticle(particles[i]);
-                newParticles--;
-            }
-        }
-
-        for (auto& p : particles) {
-            if (p.life > 0.0f) {
-                p.life -= dt;
-                p.velocity.y += gravity * dt * 0.2f;
-                p.position += p.velocity * dt;
-            }
-        }
-    }
-
-    void Render(const glm::mat4& view, const glm::mat4& projection) override {
-        shader->Bind();
-        shader->SetMat4f("u_View", view);
-        shader->SetMat4f("u_Projection", projection);
-        shader->Set1f("u_PointSize", 8.0f);
-        shader->SetVec4f("u_Color", glm::vec4(1.0f, 0.8f, 0.2f, 1.0f));
-
-        std::vector<glm::vec3> positions;
-        positions.reserve(maxParticles);
-        for (const auto& p : particles)
-            if (p.life > 0.0f)
-                positions.push_back(p.position);
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, positions.size() * sizeof(glm::vec3), positions.data());
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_POINTS, 0, positions.size());
-        glBindVertexArray(0);
-    }
-
-    void ResetParticle(Particle& p) override {
-        p.position = emitterPos;
-        p.velocity = glm::vec3(
-            ((rand() % 100) / 100.0f - 0.5f) * particleSpeed,
-            (rand() % 100) / 100.0f * particleSpeed,
-            ((rand() % 100) / 100.0f - 0.5f) * particleSpeed
-        );
-        p.life = particleLife;
-    }
-
-    void ImGuiControls() override {
-        ImGui::Text("Point Particle System");
-        ImGui::SliderFloat3("Emitter Position", glm::value_ptr(emitterPos), -5.0f, 5.0f);
-        ImGui::SliderFloat("Emission Rate", &emissionRate, 0.0f, 1000.0f);
-        ImGui::SliderFloat("Speed", &particleSpeed, 0.1f, 10.0f);
-        ImGui::SliderFloat("Lifetime", &particleLife, 0.1f, 10.0f);
-        ImGui::SliderFloat("Gravity", &gravity, -20.0f, 0.0f);
-    }
-
-private:
-    Shader* shader;
-};
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
 class BillboardParticleSystem : public ParticleSystem {
 public:
@@ -201,14 +97,28 @@ public:
         shader->SetMat4f("u_Projection", projection);
         shader->Set1i("u_Texture", 0);
 
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
 
-        glBindVertexArray(VAO);
-        for (const auto& p : particles) {
-            if (p.life <= 0.0f) continue;
+        std::vector<const Particle*> aliveParticles;
+        aliveParticles.reserve(particles.size());
+        for (const auto& p : particles)
+            if (p.life > 0.0f)
+                aliveParticles.push_back(&p);
 
-            glm::mat4 model = glm::translate(glm::mat4(1.0f), p.position);
+        std::sort(aliveParticles.begin(), aliveParticles.end(), [&](const Particle* a, const Particle* b) {
+            float da = glm::length2(camera.Position - a->position);
+            float db = glm::length2(camera.Position - b->position);
+            return da > db;
+            });
+
+        glBindVertexArray(VAO);
+        for (const auto* p : aliveParticles) {
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), p->position);
             model = glm::scale(model, glm::vec3(particleSize));
 
             // extract camera right/up vectors from view
@@ -223,7 +133,7 @@ public:
 
             model *= billboard;
             shader->SetMat4f("u_Model", model);
-            shader->Set1f("u_Alpha", p.life / particleLife);
+            shader->Set1f("u_Alpha", p->life / particleLife);
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
         }
         glBindVertexArray(0);
@@ -262,8 +172,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // FIXME: Introduce rendering on a separate thread
 }
 
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-
 const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
 
 void RenderScene(const Shader& shader, unsigned int cubeVAO, unsigned int planeVAO)
@@ -292,7 +200,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(800, 600, "ImGui + GLFW + GLAD", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(1920, 1080, "ImGui + GLFW + GLAD", nullptr, nullptr);
     if (!window)
         return -1;
     glfwMakeContextCurrent(window);
@@ -311,7 +219,7 @@ int main()
         return -1;
     }
 
-    glViewport(0, 0, 800, 600);
+    glViewport(0, 0, 1920, 1080);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -321,7 +229,7 @@ int main()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", 16.0f);
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", 32.0f);
 
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -511,11 +419,7 @@ int main()
     shader.Set1i("u_NormalMap", 2);
 
     // -------------------- PARTICLE SYSTEM SETUP --------------------
-    ParticleSystem* particleSystem = nullptr;
-    PointParticleSystem pointParticles;
-    BillboardParticleSystem billboardParticles;
-    particleSystem = &pointParticles;
-    int currentSystem = 0; // 0 = points, 1 = billboard
+    BillboardParticleSystem particleSystem;
 
     float deltaTime = 0.016f;
     float lastFrame = 0.0f;
@@ -552,19 +456,14 @@ int main()
 
         if (ImGui::CollapsingHeader("Particle Systems"))
         {
-            ImGui::Text("Select System:");
-            const char* systems[] = { "Points", "Billboards" };
-            if (ImGui::Combo("Type", &currentSystem, systems, 2)) {
-                particleSystem = (currentSystem == 0) ? (ParticleSystem*)&pointParticles : (ParticleSystem*)&billboardParticles;
-            }
-
-            particleSystem->ImGuiControls();
+            particleSystem.ImGuiControls();
         }
 
         ImGui::End();
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
+        glDepthMask(GL_TRUE);
         glCullFace(GL_FRONT);
         glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -589,13 +488,13 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // restore viewport for screen
-        glViewport(0, 0, 800, 600); // or use your window size variables
+        glViewport(0, 0, 1920, 1080); // or use your window size variables
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glCullFace(GL_BACK);
 
         // glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 1920.0f / 1080.0f, 0.1f, 100.0f);
         glm::mat4 normal = glm::transpose(glm::inverse(model));
 
         shader.Bind();
@@ -625,8 +524,8 @@ int main()
         // glDrawArrays(GL_TRIANGLES, 0, 36);
         RenderScene(shader, cubeVAO, planeVAO);
 
-        particleSystem->Update(deltaTime);
-        particleSystem->Render(view, projection);
+        particleSystem.Update(deltaTime);
+        particleSystem.Render(view, projection);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
