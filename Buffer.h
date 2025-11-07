@@ -10,7 +10,7 @@ enum class ShaderDataType
     None = 0, Float, Float2, Float3, Float4, Mat3, Mat4, Int, Int2, Int3, Int4, Bool
 };
 
-static uint32_t ShaderDataTypeSize(ShaderDataType type)
+constexpr uint32_t ShaderDataTypeSize(ShaderDataType type)
 {
     switch (type)
     {
@@ -35,7 +35,7 @@ struct BufferElement
     std::string Name;
     ShaderDataType Type;
     uint32_t Size;
-    size_t Offset;
+    uint32_t Offset;
     bool Normalized;
 
     BufferElement() = default;
@@ -87,7 +87,7 @@ public:
 private:
     void CalculateOffsetsAndStride()
     {
-        size_t offset = 0;
+        uint32_t offset = 0;
         m_Stride = 0;
         for (auto& element : m_Elements)
         {
@@ -104,29 +104,38 @@ private:
 class VertexBuffer
 {
 public:
-    ~VertexBuffer() = default;
+    VertexBuffer(uint32_t size);
+    VertexBuffer(const void* vertices, uint32_t size);
+    ~VertexBuffer();
 
+public:
     void Bind() const;
     void Unbind() const;
 
     void SetData(const void* data, uint32_t size);
 
-    const BufferLayout& GetLayout() const;
+    const BufferLayout& GetLayout() const { return m_Layout; }
     void SetLayout(const BufferLayout& layout);
 
-    static std::shared_ptr<VertexBuffer> Create(uint32_t size);
-    static std::shared_ptr<VertexBuffer> Create(float* vertices, uint32_t size);
+private:
+    uint32_t m_RendererID;
+    BufferLayout m_Layout;
+
 };
 
 class IndexBuffer
 {
 public:
-    ~IndexBuffer() = default;
+    IndexBuffer(const uint32_t* indices, uint32_t count);
+    ~IndexBuffer();
 
+public:
     void Bind() const;
     void Unbind() const;
 
-    uint32_t GetCount() const;
+    uint32_t GetCount() const { return m_Count; }
 
-    static std::shared_ptr<IndexBuffer> Create(uint32_t* indices, uint32_t count);
+private:
+    uint32_t m_RendererID;
+    uint32_t m_Count;
 };

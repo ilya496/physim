@@ -18,6 +18,8 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include "Model.h"
+#include "Buffer.h"
+#include "VertexArray.h"
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 
@@ -146,7 +148,6 @@ int main()
            0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 0.0f
     };
 
-
     unsigned int cubeVAO, cubeVBO;
     glGenVertexArrays(1, &cubeVAO);
     glGenBuffers(1, &cubeVBO);
@@ -165,6 +166,13 @@ int main()
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
+
+    BufferLayout bl({
+        { ShaderDataType::Float3, "a_Pos" },
+        { ShaderDataType::Float3, "a_Normal" },
+        { ShaderDataType::Float2, "a_TexCoord" },
+        });
+
 
     float planeVertices[] = {
         // positions             // normals          // texcoords
