@@ -64,6 +64,8 @@ add_executable(${PROJECT_NAME}
     main.cpp
     Shader.cpp
     Model.cpp
+    Buffer.cpp
+    VertexArray.cpp
 )
 
 

@@ -69,14 +69,10 @@ struct BufferElement
 class BufferLayout
 {
 public:
-    BufferLayout() {}
+    BufferLayout() = default;
+    BufferLayout(std::initializer_list<BufferElement> elements);
 
-    BufferLayout(std::initializer_list<BufferElement> elements)
-        : m_Elements(elements)
-    {
-        CalculateOffsetsAndStride();
-    }
-
+public:
     uint32_t GetStride() const { return m_Stride; }
     const std::vector<BufferElement>& GetElements() const { return m_Elements; }
 
@@ -84,18 +80,10 @@ public:
     std::vector<BufferElement>::iterator end() { return m_Elements.end(); }
     std::vector<BufferElement>::const_iterator begin() const { return m_Elements.begin(); }
     std::vector<BufferElement>::const_iterator end() const { return m_Elements.end(); }
+
 private:
-    void CalculateOffsetsAndStride()
-    {
-        uint32_t offset = 0;
-        m_Stride = 0;
-        for (auto& element : m_Elements)
-        {
-            element.Offset = offset;
-            offset += element.Size;
-            m_Stride += element.Size;
-        }
-    }
+    void CalculateOffsetsAndStride();
+
 private:
     std::vector<BufferElement> m_Elements;
     uint32_t m_Stride = 0;
@@ -115,12 +103,14 @@ public:
     void SetData(const void* data, uint32_t size);
 
     const BufferLayout& GetLayout() const { return m_Layout; }
-    void SetLayout(const BufferLayout& layout);
+    void SetLayout(const BufferLayout& layout) { m_Layout = layout; }
+
+    static std::shared_ptr<VertexBuffer> Create(uint32_t size);
+    static std::shared_ptr<VertexBuffer> Create(const void* vertices, uint32_t size);
 
 private:
     uint32_t m_RendererID;
     BufferLayout m_Layout;
-
 };
 
 class IndexBuffer
@@ -134,6 +124,8 @@ public:
     void Unbind() const;
 
     uint32_t GetCount() const { return m_Count; }
+
+    static std::shared_ptr<IndexBuffer> Create(const uint32_t* indices, uint32_t count);
 
 private:
     uint32_t m_RendererID;

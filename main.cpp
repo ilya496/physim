@@ -31,13 +31,14 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 
 const unsigned int SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
 
-void RenderScene(const Shader& shader, unsigned int cubeVAO, unsigned int planeVAO)
+void RenderScene(const Shader& shader, std::shared_ptr<VertexArray> cubeVAO, unsigned int planeVAO)
 {
     // Cube
     glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     shader.SetMat4f("u_Model", model);
-    glBindVertexArray(cubeVAO);
-    // glDrawArrays(GL_TRIANGLES, 0, 36);
+    cubeVAO->Bind();
+    // glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
 
     // Floor
     model = glm::mat4(1.0f);
@@ -148,30 +149,34 @@ int main()
            0.5f,  0.5f,  0.5f,   0.0f,  1.0f,  0.0f,   1.0f, 0.0f
     };
 
-    unsigned int cubeVAO, cubeVBO;
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    glBindVertexArray(cubeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    // unsigned int cubeVAO, cubeVBO;
+    // glGenVertexArrays(1, &cubeVAO);
+    // glGenBuffers(1, &cubeVBO);
+    // glBindVertexArray(cubeVAO);
+    // glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    // glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
 
-    // Positions
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // Normals
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // TexCoords
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
+    // // Positions
+    // glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+    // glEnableVertexAttribArray(0);
+    // // Normals
+    // glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    // glEnableVertexAttribArray(1);
+    // // TexCoords
+    // glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    // glEnableVertexAttribArray(2);
 
-    glBindVertexArray(0);
+    // glBindVertexArray(0);
 
     BufferLayout bl({
         { ShaderDataType::Float3, "a_Pos" },
         { ShaderDataType::Float3, "a_Normal" },
         { ShaderDataType::Float2, "a_TexCoord" },
         });
+    std::shared_ptr<VertexBuffer> vbo = VertexBuffer::Create(cubeVertices, sizeof(cubeVertices));
+    vbo->SetLayout(bl);
+    std::shared_ptr<VertexArray> vao = VertexArray::Create();
+    vao->AddVertexBuffer(vbo);
 
 
     float planeVertices[] = {
@@ -340,7 +345,7 @@ int main()
 
         glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         depthShader.SetMat4f("u_Model", model);
-        RenderScene(depthShader, cubeVAO, planeVAO);
+        RenderScene(depthShader, vao, planeVAO);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -379,7 +384,7 @@ int main()
 
         // glBindVertexArray(cubeVAO);
         // glDrawArrays(GL_TRIANGLES, 0, 36);
-        RenderScene(shader, cubeVAO, planeVAO);
+        RenderScene(shader, vao, planeVAO);
 
         glm::mat4 modelMat = glm::mat4(1.0f);
         modelMat = glm::translate(modelMat, glm::vec3(0.0f, 0.0f, 0.0f));
