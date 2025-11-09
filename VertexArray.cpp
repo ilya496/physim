@@ -44,7 +44,7 @@ void VertexArray::AddVertexBuffer(const std::shared_ptr<VertexBuffer>& vertexBuf
                 ShaderDataTypeToOpenGLType(element.Type),
                 element.Normalized ? GL_TRUE : GL_FALSE,
                 layout.GetStride(),
-                (const void*)element.Offset
+                reinterpret_cast<const void*>(static_cast<uintptr_t>(element.Offset))
             );
             m_VertexBufferIndex++;
             break;
@@ -62,28 +62,9 @@ void VertexArray::AddVertexBuffer(const std::shared_ptr<VertexBuffer>& vertexBuf
                 element.GetComponentCount(),
                 ShaderDataTypeToOpenGLType(element.Type),
                 layout.GetStride(),
-                (const void*)element.Offset
+                reinterpret_cast<const void*>(static_cast<uintptr_t>(element.Offset))
             );
             m_VertexBufferIndex++;
-            break;
-        }
-
-        case ShaderDataType::Mat3:
-        case ShaderDataType::Mat4:
-        {
-            uint8_t count = element.GetComponentCount();
-            for (uint8_t i = 0; i < count; i++)
-            {
-                glEnableVertexAttribArray(m_VertexBufferIndex);
-                glVertexAttribPointer(m_VertexBufferIndex,
-                    count,
-                    ShaderDataTypeToOpenGLType(element.Type),
-                    element.Normalized ? GL_TRUE : GL_FALSE,
-                    layout.GetStride(),
-                    (const void*)(element.Offset + sizeof(float) * count * i));
-                glVertexAttribDivisor(m_VertexBufferIndex, 1);
-                m_VertexBufferIndex++;
-            }
             break;
         }
         }

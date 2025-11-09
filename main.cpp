@@ -178,7 +178,6 @@ int main()
     std::shared_ptr<VertexArray> vao = VertexArray::Create();
     vao->AddVertexBuffer(vbo);
 
-
     float planeVertices[] = {
         // positions             // normals          // texcoords
         -10.0f, -0.5f,  10.0f,     0.0f, 1.0f, 0.0f,   0.0f, 0.0f,

@@ -1,4 +1,5 @@
 #pragma once
+
 #include <string>
 #include <vector>
 #include <assimp/scene.h>
@@ -7,17 +8,44 @@
 #include <glm/glm.hpp>
 #include "Shader.h"
 #include <glad/glad.h>
+#include "Buffer.h"
+#include "VertexArray.h"
 
-struct Vertex {
+struct Vertex
+{
     glm::vec3 Position;
     glm::vec3 Normal;
     glm::vec2 TexCoords;
+    glm::vec3 Tangent;
+    glm::vec3 Bitangent;
+};
+
+enum class TextureType
+{
+    DIFFUSE, SPECULAR, NORMAL
 };
 
 struct Texture {
     unsigned int id;
-    std::string type;
+    TextureType type;
     std::string path;
+};
+
+
+class Geometry
+{
+public:
+    Geometry(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+
+public:
+    void Bind() const;
+    void Unbind() const;
+
+    uint32_t GetIndexCount() const;
+private:
+    std::shared_ptr<VertexArray> m_VertexArray;
+    std::shared_ptr<VertexBuffer> m_VertexBuffer;
+    std::shared_ptr<IndexBuffer> m_IndexBuffer;
 };
 
 class Mesh {
