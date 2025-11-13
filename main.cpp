@@ -27,6 +27,23 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height)
     // FIXME: Introduce rendering on a separate thread
 }
 
+void SetupImGuiFonts(GLFWwindow* window, const char* font)
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    float xscale, yscale;
+    glfwGetWindowContentScale(window, &xscale, &yscale);
+
+    float scale = xscale;
+    float baseFontSize = 16.0f;
+    float fontSize = baseFontSize * scale;
+
+    io.Fonts->Clear();
+    io.FontDefault = io.Fonts->AddFontFromFileTTF(font, fontSize);
+
+    io.Fonts->Build();
+}
+
 int main()
 {
     if (!glfwInit())
@@ -67,11 +84,11 @@ int main()
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("../JetBrainsMono-Regular.ttf", 32.0f);
-
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 460");
+
+    SetupImGuiFonts(window, "../JetBrainsMono-Regular.ttf");
 
     float planeVertices[] = {
         // positions             // normals          // texcoords
