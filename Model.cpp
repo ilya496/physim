@@ -68,11 +68,11 @@ Geometry::Geometry(const std::vector<Vertex>& vertices, const std::vector<uint32
     m_VertexArray = VertexArray::Create();
     m_VertexArray->Bind();
 
-    m_VertexBuffer = VertexBuffer::Create(vertices.data(), vertices.size() * sizeof(Vertex));
+    m_VertexBuffer = VertexBuffer::Create(vertices.data(), static_cast<uint32_t>(vertices.size() * sizeof(Vertex)));
     m_VertexBuffer->SetLayout(CreateVertexBufferLayout());
     m_VertexArray->AddVertexBuffer(m_VertexBuffer);
 
-    m_IndexBuffer = IndexBuffer::Create(indices.data(), indices.size());
+    m_IndexBuffer = IndexBuffer::Create(indices.data(), static_cast<uint32_t>(indices.size()));
     m_VertexArray->SetIndexBuffer(m_IndexBuffer);
 
     m_VertexArray->Unbind();
@@ -94,6 +94,8 @@ std::shared_ptr<Geometry> Geometry::Generate(MeshPrimitive primitive)
     {
     case MeshPrimitive::CUBE: return GenerateCube();
     case MeshPrimitive::PLANE: return GeneratePlane();
+    default:
+        return nullptr;
     }
 }
 
