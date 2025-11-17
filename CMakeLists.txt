@@ -1,24 +1,23 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13)
 project(Physim)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ----------------------------
-# GLFW (build from source)
+# GLFW
 # ----------------------------
 set(GLFW_ROOT "${CMAKE_SOURCE_DIR}/libs/glfw")
 add_subdirectory(${GLFW_ROOT})
-include_directories("${GLFW_ROOT}/include")
 
 # ----------------------------
-# GLAD (build from source)
+# GLAD
 # ----------------------------
 add_library(glad "${CMAKE_SOURCE_DIR}/libs/glad/src/glad.c")
 target_include_directories(glad PUBLIC "${CMAKE_SOURCE_DIR}/libs/glad/include")
 
 # ----------------------------
-# Dear ImGui (build from source)
+# Dear ImGui
 # ----------------------------
 set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/libs/imgui")
 
@@ -39,7 +38,7 @@ target_include_directories(imgui PUBLIC
 )
 
 # ----------------------------
-# GLM & stb_image (header-only)
+# GLM / stb (header-only)
 # ----------------------------
 include_directories(
   "${CMAKE_SOURCE_DIR}/libs/glm"
@@ -47,33 +46,23 @@ include_directories(
 )
 
 # ----------------------------
-# Assimp (build from source using FetchContent)
+# Assimp (FetchContent)
 # ----------------------------
 include(FetchContent)
 FetchContent_Declare(
   assimp
   GIT_REPOSITORY https://github.com/assimp/assimp.git
-  GIT_TAG        master # You can pin to a version, e.g., "v5.3.1"
+  GIT_TAG master
 )
 FetchContent_MakeAvailable(assimp)
 
-# ----------------------------
-# Application
-# ----------------------------
-add_executable(${PROJECT_NAME}
-    main.cpp
-    Shader.cpp
-    Model.cpp
-    Buffer.cpp
-    VertexArray.cpp
-)
+include(FetchContent)
 
+FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+FetchContent_MakeAvailable(json)
 
-target_link_libraries(${PROJECT_NAME}
-    PRIVATE
-        imgui
-        glad
-        glfw
-        assimp
-        opengl32
-)
+# ----------------------------
+# Add engine + editor
+# ----------------------------
+add_subdirectory(engine)
+add_subdirectory(editor)

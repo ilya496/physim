@@ -63,6 +63,7 @@ int main()
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, [](GLFWwindow* w, double xpos, double ypos)
+
         { camera.HandleMouseMovement(w, xpos, ypos); });
 
     glfwSetScrollCallback(window, [](GLFWwindow* w, double xoffset, double yoffset)
