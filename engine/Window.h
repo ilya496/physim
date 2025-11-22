@@ -1,52 +1,65 @@
 #pragma once
 
 #include <string>
-#include <memory>
+#include <functional>
 #include <glm/glm.hpp>
+#include <GLFW/glfw3.h>
 
-struct WindowProps {
-    std::string title;
-    int width;
-    int height;
-    bool VSync;
+#include "Event.h"
 
-    WindowProps(const std::string& title = std::string("Physim"),
-        int width = 1920,
-        int height = 1080,
-        bool VSync = false)
-        : width(width), height(height), title(title), VSync(VSync) {
-    }
+struct WindowProps
+{
+    std::string title = "Physim";
+    int width = 1920;
+    int height = 1080;
+    bool VSync = false;
 };
 
 class Window
 {
 public:
-    virtual ~Window() = default;
-    virtual void OnUpdate() = 0;
+    using EventCallbackFn = std::function<void(Event&)>;
 
-    virtual void SetTitle(const std::string& title) = 0;
-    virtual bool IsVSync() const = 0;
-    virtual void SetVSync(bool enabled) = 0;
-    virtual glm::ivec2 GetFramebufferSize() const = 0;
-    virtual void* GetNativeWindow() const = 0;
-    virtual bool IsFullscreen() const = 0;
-    virtual void SetFullscreen(bool enabled) = 0;
+    Window(const WindowProps& props = {});
+    ~Window();
 
-    virtual void Minimize() = 0;
-    virtual void Maximize() = 0;
-    virtual void Restore() = 0;
-    virtual bool IsMaximized() const = 0;
-    virtual void Close() = 0;
-    virtual void SetPosition(int x, int y) = 0;
-    virtual glm::ivec2 GetPosition() const = 0;
+    void OnUpdate();
 
-    // virtual bool IsKeyPressed(KeyCode key) = 0;
-    // virtual bool IsMouseButtonPressed(MouseCode key) = 0;
-    // virtual glm::vec2 GetMousePosition() = 0;
+    void SetTitle(const std::string& title);
+    bool IsVSync() const { return m_VSync; }
+    void SetVSync(bool enabled);
 
-    virtual bool ShouldClose() = 0;
+    glm::ivec2 GetFramebufferSize() const;
+    glm::ivec2 GetPosition() const;
+    void SetPosition(int x, int y);
 
-    // virtual void SetEventCallback(const std::function<void(std::shared_ptr<Event>)>& callback) = 0;
+    GLFWwindow* GetNativeWindow() const { return m_Window; }
 
-    static std::shared_ptr<Window> Create(const WindowProps props);
+    bool ShouldClose() const { return glfwWindowShouldClose(m_Window); }
+
+    void Minimize();
+    void Maximize();
+    void Restore();
+
+    bool IsFullscreen() const { return m_IsFullscreen; }
+    void SetFullscreen(bool enabled);
+    bool IsMaximized() const;
+
+    void Close();
+
+    void SetEventCallback(const EventCallbackFn& callback) { m_EventCallback = callback; }
+
+private:
+    void Init();
+    void InitCallbacks();
+
+private:
+    GLFWwindow* m_Window = nullptr;
+    int m_Width, m_Height;
+    std::string m_Title;
+    bool m_VSync;
+
+    bool m_IsFullscreen = false;
+    GLFWmonitor* m_PreviousMonitor = nullptr;
+    EventCallbackFn m_EventCallback;
 };

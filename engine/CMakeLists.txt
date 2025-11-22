@@ -5,8 +5,8 @@ add_library(engine STATIC
     VertexArray.cpp
     Application.cpp
     Window.cpp
-    Platform/GLFW/GLFWWindow.cpp
     UUID.cpp
+    LayerStack.cpp
 )
 
 target_link_libraries(engine
