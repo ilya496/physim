@@ -14,7 +14,9 @@ public:
     void PushLayer(std::unique_ptr<Layer> layer);
     void PopLayer(Layer* layer);
 
-    void OnUpdate();
+    void OnUpdate(float dt);
+    void OnFixedUpdate(float fixedDt);
+    void OnRender();
     void Broadcast(Event& event);
 
 private:

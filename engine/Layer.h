@@ -9,6 +9,8 @@ public:
 
     virtual void OnAttach() {};
     virtual void OnDetach() {};
-    virtual void OnUpdate() {};
+    virtual void OnUpdate(float dt) {};
+    virtual void OnFixedUpdate(float fixedDt) {};
     virtual void OnEvent(Event& event) {};
+    virtual void OnRender() {};
 };

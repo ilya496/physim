@@ -7,6 +7,7 @@ add_library(engine STATIC
     Window.cpp
     UUID.cpp
     LayerStack.cpp
+    Timer.cpp
 )
 
 target_link_libraries(engine

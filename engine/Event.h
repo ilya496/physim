@@ -1,6 +1,9 @@
 #pragma once
 
+#include <string>
+
 enum class EventType {
+    None = 0,
     KEY_PRESS_EVENT,
     KEY_RELEASE_EVENT,
     KEY_REPEAT_EVENT,
@@ -21,6 +24,8 @@ public:
     virtual ~Event() = default;
 
     virtual EventType GetType() const = 0;
+    virtual const char* GetName() const = 0;
+    virtual std::string ToString() const { return GetName(); }
 
     bool IsConsumed() const { return m_IsConsumed; }
     void Consume() { m_IsConsumed = true; }
@@ -37,6 +42,7 @@ public:
 
     static EventType GetStaticType() { return EventType::WINDOW_RESIZE_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "WINDOW_RESIZE_EVENT"; }
 
     int Width, Height;
 };
@@ -48,6 +54,7 @@ public:
 
     static EventType GetStaticType() { return EventType::WINDOW_CLOSE_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "WINDOW_CLOSE_EVENT"; }
 };
 
 class KeyPressEvent : public Event
@@ -59,6 +66,7 @@ public:
 
     static EventType GetStaticType() { return EventType::KEY_PRESS_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "KEY_PRESS_EVENT"; }
 
     int KeyCode;
     bool IsRepeat;
@@ -73,6 +81,7 @@ public:
 
     static EventType GetStaticType() { return EventType::KEY_RELEASE_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "KEY_RELEASE_EVENT"; }
 
     int KeyCode;
 };
@@ -86,6 +95,7 @@ public:
 
     static EventType GetStaticType() { return EventType::MOUSE_BUTTON_PRESS_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "MOUSE_BUTTON_PRESS_EVENT"; }
 
     int Button;
 };
@@ -99,6 +109,7 @@ public:
 
     static EventType GetStaticType() { return EventType::MOUSE_BUTTON_RELEASE_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "MOUSE_BUTTON_RELEASE_EVENT"; }
 
     int Button;
 };
@@ -112,6 +123,7 @@ public:
 
     static EventType GetStaticType() { return EventType::MOUSE_MOVE_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "MOUSE_MOVE_EVENT"; }
 
     float X, Y;
 };
@@ -125,6 +137,7 @@ public:
 
     static EventType GetStaticType() { return EventType::MOUSE_SCROLL_EVENT; }
     virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "MOUSE_SCROLL_EVENT"; }
 
     float X, Y;
 };

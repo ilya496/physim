@@ -25,10 +25,22 @@ void LayerStack::PopLayer(Layer* layer)
     }
 }
 
-void LayerStack::OnUpdate()
+void LayerStack::OnUpdate(float dt)
 {
     for (auto& layer : m_Layers)
-        layer->OnUpdate();
+        layer->OnUpdate(dt);
+}
+
+void LayerStack::OnFixedUpdate(float fixedDt)
+{
+    for (auto& layer : m_Layers)
+        layer->OnFixedUpdate(fixedDt);
+}
+
+void LayerStack::OnRender()
+{
+    for (auto& layer : m_Layers)
+        layer->OnRender();
 }
 
 void LayerStack::Broadcast(Event& event)
