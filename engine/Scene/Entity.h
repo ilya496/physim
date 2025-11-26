@@ -1,10 +1,11 @@
 #pragma once
 
-#include "UUID.h"
-#include "Scene.h"
-#include "Components.h"
-
+#include <string>
 #include "entt.hpp"
+
+#include "UUID.h"
+#include "Components.h"
+#include "Scene.h"
 
 class Entity
 {
@@ -16,7 +17,8 @@ public:
     template<typename T, typename... Args>
     T& AddComponent(Args&&... args)
     {
-        T& component = m_Scene->m_Registry.emplace<T>(m_Handle, std::forward<Args>(args)...);
+        auto& registry = m_Scene->GetRegistry();
+        T& component = registry.emplace<T>(m_Handle, std::forward<Args>(args)...);
         m_Scene->OnComponentAdded<T>(*this, component);
         return component;
     }
@@ -24,7 +26,8 @@ public:
     template<typename T, typename... Args>
     T& AddOrReplaceComponent(Args&&... args)
     {
-        T& component = m_Scene->m_Registry.emplace_or_replace<T>(m_Handle, std::forward<Args>(args)...);
+        auto& registry = m_Scene->GetRegistry();
+        T& component = registry.emplace_or_replace<T>(m_Handle, std::forward<Args>(args)...);
         m_Scene->OnComponentAdded<T>(*this, component);
         return component;
     }
@@ -32,27 +35,46 @@ public:
     template<typename T>
     T& GetComponent()
     {
-        return m_Scene->m_Registry.get<T>(m_Handle);
+        return m_Scene->GetRegistry().get<T>(m_Handle);
     }
 
     template<typename T>
-    bool HasComponent()
+    const T& GetComponent() const
     {
-        return m_Scene->m_Registry.has<T>(m_Handle);
+        return m_Scene->m_Registry.get<T>(m_Handle);
+    }
+
+
+    template<typename T>
+    bool HasComponent() const
+    {
+        return m_Scene->GetRegistry().all_of<T>(m_Handle);
     }
 
     template<typename T>
     void RemoveComponent()
     {
-        m_Scene->m_Registry.remove<T>(m_Handle);
+        m_Scene->GetRegistry().remove<T>(m_Handle);
     }
 
-    operator bool() const { return m_Handle != entt::null; }
+    explicit operator bool() const { return m_Handle != entt::null; }
     operator entt::entity() const { return m_Handle; }
-    operator uint32_t() const { return (uint32_t)m_Handle; }
+    uint32_t GetHandle() const { return static_cast<uint32_t>(m_Handle); }
 
-    UUID GetUUID() { return GetComponent<IDComponent>().ID; }
-    const std::string& GetName() { return GetComponent<TagComponent>().Tag; }
+    UUID GetUUID() const
+    {
+        if (HasComponent<IDComponent>())
+            return GetComponent<IDComponent>().ID;
+        return UUID{};
+    }
+
+    const std::string& GetName() const
+    {
+        static std::string empty = "";
+        if (HasComponent<TagComponent>())
+            return GetComponent<TagComponent>().Tag;
+        return empty;
+    }
 
     bool operator==(const Entity& other) const
     {

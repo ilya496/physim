@@ -8,6 +8,8 @@ add_library(engine STATIC
     UUID.cpp
     LayerStack.cpp
     Timer.cpp
+    Scene/Scene.cpp
+    Scene/Entity.cpp
 )
 
 target_link_libraries(engine
