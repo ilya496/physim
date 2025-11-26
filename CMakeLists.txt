@@ -43,6 +43,7 @@ target_include_directories(imgui PUBLIC
 include_directories(
   "${CMAKE_SOURCE_DIR}/libs/glm"
   "${CMAKE_SOURCE_DIR}/libs/stb"
+  "${CMAKE_SOURCE_DIR}/libs/entt"
 )
 
 # ----------------------------
