@@ -14,9 +14,6 @@
 #include <iostream>
 #include "Camera.h"
 
-#include <assimp/scene.h>
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
 #include "Model.h"
 
 Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
