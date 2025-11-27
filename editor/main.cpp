@@ -3,9 +3,12 @@
 class Editor : public Application
 {
 public:
-    Editor() : Application() {}
+    Editor() : Application()
+    {
+    }
 
-    virtual void Shutdown() override {
+    virtual void Shutdown() override
+    {
         Application::Shutdown();
     }
 
