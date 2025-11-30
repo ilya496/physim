@@ -10,6 +10,7 @@ add_library(engine STATIC
     Timer.cpp
     Scene/Scene.cpp
     Scene/Entity.cpp
+    EventBus.cpp
 )
 
 target_link_libraries(engine

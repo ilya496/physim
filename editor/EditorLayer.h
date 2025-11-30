@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include "Layer.h"
 #include "Window.h"
 
@@ -8,7 +7,7 @@ class EditorLayer : public Layer
 {
 public:
     EditorLayer(Window* window);
-    ~EditorLayer() override = default;
+    ~EditorLayer() override;
 
     void OnAttach() override;
     void OnDetach() override;
@@ -17,7 +16,8 @@ public:
     void OnRender() override;
 private:
     void SetupImGuiFonts(const char* fontPath);
-    void ProcessInput(float dt);
+    void BeginDockspace();
+    void DrawAssetsPanel();
 
 private:
     Window* m_Window = nullptr;

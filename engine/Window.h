@@ -5,7 +5,7 @@
 #include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
 
-#include "Event.h"
+// #include "Event.h"
 
 struct WindowProps
 {
@@ -18,7 +18,7 @@ struct WindowProps
 class Window
 {
 public:
-    using EventCallbackFn = std::function<void(Event&)>;
+    // using EventCallbackFn = std::function<void(Event&)>;
 
     Window(const WindowProps& props = {});
     ~Window();
@@ -35,8 +35,6 @@ public:
 
     GLFWwindow* GetNativeWindow() const { return m_Window; }
 
-    bool ShouldClose() const { return glfwWindowShouldClose(m_Window); }
-
     void Minimize();
     void Maximize();
     void Restore();
@@ -45,9 +43,12 @@ public:
     void SetFullscreen(bool enabled);
     bool IsMaximized() const;
 
-    void Close();
+    void MakeContextCurrent();
+    void DetachContext();
+    void PollEvents();
+    void SwapBuffers();
 
-    void SetEventCallback(const EventCallbackFn& callback) { m_EventCallback = callback; }
+    void Close();
 
 private:
     void Init();
@@ -61,5 +62,4 @@ private:
 
     bool m_IsFullscreen = false;
     GLFWmonitor* m_PreviousMonitor = nullptr;
-    EventCallbackFn m_EventCallback;
 };
