@@ -1,7 +1,5 @@
 #include "EventBus.h"
 
-std::shared_mutex EventBus::s_Mutex;
-
 EventBus::Subscription::Subscription(
     std::type_index type,
     size_t index,

@@ -15,27 +15,9 @@ Application::Application(WindowProps windowProps)
             }
         );
 
-    m_WindowResizeSub =
-        EventBus::Subscribe<WindowResizeEvent>(
-            [this](const WindowResizeEvent& e)
-            {
-                // glViewport(0, 0, e.Width, e.Height);
-                // std::cout << "Window resized!" << '\n';
-            }
-        );
-
     m_LastFrameTime = glfwGetTime();
-
-    m_Window->DetachContext();
-    m_RenderThread = std::thread(&Application::RenderThreadFunc, this);
 }
 
-Application::~Application()
-{
-    m_RenderThreadRunning = false;
-    if (m_RenderThread.joinable())
-        m_RenderThread.join();
-}
 
 void Application::Run()
 {
@@ -53,10 +35,7 @@ void Application::Run()
 
         m_LayerStack.OnUpdate(Timer::DeltaTime());
 
-        m_RenderState = m_SimState;
-        m_NewFrameAvailable = true;
-
-        // m_LayerStack.OnRender();
+        m_LayerStack.OnRender();
         m_Window->PollEvents();
 
         std::cout << "FPS: " << Timer::FPS()
@@ -69,28 +48,4 @@ void Application::Run()
 void Application::PushLayer(std::unique_ptr<Layer> layer)
 {
     m_LayerStack.PushLayer(std::move(layer));
-}
-
-void Application::RenderThreadFunc()
-{
-    m_Window->MakeContextCurrent();
-
-    while (m_RenderThreadRunning)
-    {
-        if (!m_NewFrameAvailable)
-        {
-            // Avoid spinning at 100% CPU
-            std::this_thread::sleep_for(std::chrono::microseconds(50));
-            continue;
-        }
-
-        m_NewFrameAvailable = false;
-
-        // 1. Render using m_RenderState
-        // Call your layers' render:
-        m_LayerStack.OnRender();
-
-        // 2. Swap buffers
-        m_Window->SwapBuffers();
-    }
 }

@@ -5,7 +5,6 @@
 #include <vector>
 #include <typeindex>
 #include <memory>
-#include <shared_mutex>
 
 class EventBus
 {
@@ -36,8 +35,6 @@ public:
     template<typename EventT>
     static Subscription Subscribe(std::function<void(const EventT&)> callback)
     {
-        std::unique_lock lock(s_Mutex);
-
         auto& listeners = GetListeners<EventT>();
         listeners.push_back(std::move(callback));
         size_t index = listeners.size() - 1;
@@ -53,8 +50,6 @@ public:
     template<typename EventT>
     static void Publish(const EventT& event)
     {
-        std::shared_lock lock(s_Mutex);
-
         auto& listeners = GetListeners<EventT>();
         for (auto& listener : listeners)
         {
@@ -74,13 +69,8 @@ private:
     template<typename EventT>
     static void RemoveListener(size_t index)
     {
-        std::unique_lock lock(s_Mutex);
-
         auto& listeners = GetListeners<EventT>();
         if (index < listeners.size())
             listeners[index] = nullptr;
     }
-
-private:
-    static std::shared_mutex s_Mutex;
 };
