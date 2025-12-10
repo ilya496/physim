@@ -10,7 +10,7 @@ class Application
 {
 public:
     Application(WindowProps windowProps = WindowProps{});
-    virtual ~Application();
+    virtual ~Application() = default;
 
     void Run();
 

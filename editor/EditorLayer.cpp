@@ -1,10 +1,10 @@
 #include "EditorLayer.h"
 
+#include <EventBus.h>
+
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
-
-#include "EventBus.h"
 
 EditorLayer::EditorLayer(Window* window)
     : m_Window(window)

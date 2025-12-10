@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include "Timer.h"
+#include "asset/AssetManager.h"
 
 Application::Application(WindowProps windowProps)
 {
@@ -16,6 +17,9 @@ Application::Application(WindowProps windowProps)
         );
 
     m_LastFrameTime = glfwGetTime();
+    AssetManager man;
+    man.ImportAsset("../../brickwall.jpg");
+    man.SerializeAssetRegistry();
 }
 
 

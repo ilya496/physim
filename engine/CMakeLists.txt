@@ -5,12 +5,13 @@ add_library(engine STATIC
     VertexArray.cpp
     Application.cpp
     Window.cpp
-    UUID.cpp
     LayerStack.cpp
     Timer.cpp
-    Scene/Scene.cpp
-    Scene/Entity.cpp
+    scene/Scene.cpp
+    scene/Entity.cpp
     EventBus.cpp
+    asset/AssetManager.cpp
+    asset/AssetImporter.cpp
 )
 
 target_link_libraries(engine
