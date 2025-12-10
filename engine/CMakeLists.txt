@@ -12,6 +12,8 @@ add_library(engine STATIC
     EventBus.cpp
     asset/AssetManager.cpp
     asset/AssetImporter.cpp
+    project/Project.cpp
+    project/ProjectSerializer.cpp
 )
 
 target_link_libraries(engine

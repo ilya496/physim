@@ -3,7 +3,7 @@
 #include <string>
 #include <filesystem>
 
-#include "engine/asset/AssetManager.h"
+#include "asset/AssetManager.h"
 
 struct ProjectConfig
 {
@@ -43,7 +43,6 @@ public:
     {
         return s_ActiveProject->GetAssetFileSystemPath(path);
     }
-
 
     ProjectConfig& GetConfig() { return m_Config; }
 

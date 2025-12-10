@@ -5,24 +5,6 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-#include <iostream>
-
-// How AssetMetadata is serialized
-static void to_json(json& j, const AssetMetadata& meta)
-{
-    j = json{
-        {"Type",    (int)meta.Type},
-        {"FilePath", meta.FilePath.string()}
-    };
-}
-
-// How AssetMetadata is de-serialized
-static void from_json(const json& j, AssetMetadata& meta)
-{
-    meta.Type = (AssetType)j.at("Type").get<int>();
-    meta.FilePath = j.at("FilePath").get<std::string>();
-}
-
 static std::unordered_map<std::filesystem::path, AssetType> s_AssetExtensionMap = {
     { ".scene", AssetType::Scene },
     { ".png", AssetType::Texture },
@@ -87,16 +69,13 @@ void AssetManager::ImportAsset(const std::filesystem::path& filePath)
     if (metadata.Type == AssetType::None)
         return;
 
-    std::cout << "asset started to create\n";
     std::shared_ptr<Asset> asset = AssetImporter::ImportAsset(handle, metadata);
     if (asset)
     {
-        std::cout << "asset created\n";
         asset->Handle = handle;
         m_LoadedAssets[handle] = asset;
         m_AssetRegistry[handle] = metadata;
         SerializeAssetRegistry();
-        std::cout << "registry serialized\n";
     }
 }
 
@@ -125,19 +104,25 @@ const std::filesystem::path& AssetManager::GetFilePath(AssetHandle handle) const
 
 void AssetManager::SerializeAssetRegistry()
 {
+    // auto path = Project::GetActiveAssetRegistryPath();
+    auto path = "AssetRegistry.json";
+
     json root;
+    root["AssetRegistry"] = json::array();
 
     for (const auto& [handle, metadata] : m_AssetRegistry)
     {
-        // store by UUID string key
-        root[handle] = metadata;
+        json entry;
+        entry["Handle"] = handle.string();
+        entry["FilePath"] = metadata.FilePath.generic_string();
+        entry["Type"] = AssetTypeToString(metadata.Type);
+
+        root["AssetRegistry"].push_back(std::move(entry));
     }
 
-    std::ofstream stream(m_RegistryPath);
-    if (!stream.is_open())
-        return; // optionally log
-
-    stream << root.dump(4);   // pretty print
+    std::ofstream fout(path);
+    if (fout.is_open())
+        fout << root.dump(4);
 }
 
 bool AssetManager::DeserializeAssetRegistry()
@@ -152,12 +137,23 @@ bool AssetManager::DeserializeAssetRegistry()
     json root;
     stream >> root;
 
+    if (!root.contains("AssetRegistry"))
+        return false;
+
     m_AssetRegistry.clear();
 
-    for (auto& [key, value] : root.items())
+    for (const auto& entry : root["AssetRegistry"])
     {
-        AssetHandle handle(key);      // construct UUID from string
-        AssetMetadata meta = value.get<AssetMetadata>();
+        std::string handleStr = entry.at("Handle").get<std::string>();
+        std::string filepath = entry.at("FilePath").get<std::string>();
+        std::string typeStr = entry.at("Type").get<std::string>();
+
+        AssetHandle handle(handleStr);
+
+        AssetMetadata meta;
+        meta.FilePath = filepath;
+        meta.Type = AssetTypeFromString(typeStr);
+
         m_AssetRegistry.emplace(handle, meta);
     }
 
