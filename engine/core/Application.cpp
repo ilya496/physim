@@ -23,6 +23,7 @@ void Application::Run()
 {
     while (m_Running)
     {
+        m_Window->PollEvents();
         double now = glfwGetTime();
         Timer::Update(now);
 
@@ -36,10 +37,11 @@ void Application::Run()
         m_LayerStack.OnUpdate(Timer::DeltaTime());
 
         m_LayerStack.OnRender();
-        m_Window->PollEvents();
 
         std::cout << "FPS: " << Timer::FPS()
             << "   Frame: " << Timer::AverageFrameTime() << "\n";
+
+        m_Window->SwapBuffers();
     }
 
     Shutdown();
