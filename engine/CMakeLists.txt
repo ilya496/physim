@@ -1,15 +1,19 @@
 add_library(engine STATIC
-    Shader.cpp
-    Model.cpp
-    Buffer.cpp
-    VertexArray.cpp
-    Application.cpp
-    Window.cpp
-    UUID.cpp
-    LayerStack.cpp
-    Timer.cpp
-    Scene/Scene.cpp
-    Scene/Entity.cpp
+    render/Shader.cpp
+    render/Model.cpp
+    render/Buffer.cpp
+    render/VertexArray.cpp
+    core/Application.cpp
+    core/Window.cpp
+    core/LayerStack.cpp
+    core/Timer.cpp
+    core/EventBus.cpp
+    scene/Scene.cpp
+    scene/Entity.cpp
+    asset/AssetManager.cpp
+    asset/AssetImporter.cpp
+    project/Project.cpp
+    project/ProjectSerializer.cpp
 )
 
 target_link_libraries(engine

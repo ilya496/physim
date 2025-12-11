@@ -2,9 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <assimp/scene.h>
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
 #include <glm/glm.hpp>
 #include "Shader.h"
 #include <glad/glad.h>
@@ -121,9 +118,6 @@ public:
 private:
     static std::shared_ptr<Geometry> GenerateCube();
     static std::shared_ptr<Geometry> GeneratePlane();
-    // static std::shared_ptr<Geometry> GenerateUVSphere();
-    // static std::shared_ptr<Geometry> GenerateIcoSphere();
-    // static std::shared_ptr<Geometry> GenerateCylinder();
 
     static void ComputeTangents(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
 
@@ -144,19 +138,3 @@ private:
     std::shared_ptr<Geometry> m_Geometry;
     std::shared_ptr<Material> m_Material;
 };
-
-// class Model {
-// public:
-//     std::vector<Mesh> meshes;
-//     std::string directory;
-
-//     Model(const std::string& path);
-//     void Draw(const Shader& shader) const;
-
-// private:
-//     void loadModel(const std::string& path);
-//     void processNode(aiNode* node, const aiScene* scene);
-//     Mesh processMesh(aiMesh* mesh, const aiScene* scene);
-//     std::vector<Texture> loadMaterialTextures(aiMaterial* mat, aiTextureType type, const std::string& typeName);
-//     uint32_t TextureFromFile(const std::string& path, const std::string& directory);
-// };

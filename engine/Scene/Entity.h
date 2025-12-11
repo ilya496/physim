@@ -3,9 +3,9 @@
 #include <string>
 #include "entt.hpp"
 
-#include "UUID.h"
-#include "Components.h"
-#include "Scene.h"
+#include "core/UUID.h"
+#include "scene/Components.h"
+#include "scene/Scene.h"
 
 class Entity
 {

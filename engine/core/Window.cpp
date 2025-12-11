@@ -1,5 +1,8 @@
 #include "Window.h"
+
 #include <iostream>
+#include "Event.h"
+#include "EventBus.h"
 
 static bool s_WindowInitialized = false;
 
@@ -99,6 +102,26 @@ bool Window::IsMaximized() const
     return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED);
 }
 
+void Window::MakeContextCurrent()
+{
+    glfwMakeContextCurrent(m_Window);
+}
+
+void Window::DetachContext()
+{
+    glfwMakeContextCurrent(nullptr);
+}
+
+void Window::PollEvents()
+{
+    glfwPollEvents();
+}
+
+void Window::SwapBuffers()
+{
+    glfwSwapBuffers(m_Window);
+}
+
 void Window::Close()
 {
     glfwSetWindowShouldClose(m_Window, true);
@@ -138,42 +161,47 @@ void Window::InitCallbacks()
     glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* wnd, int w, int h)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            if (!window->m_EventCallback) return;
+            // if (!window->m_EventCallback) return;
 
             WindowResizeEvent ev(w, h);
-            window->m_EventCallback(ev);
+            // window->m_EventCallback(ev);
+            EventBus::Publish(ev);
         });
 
     // -------- Window Close --------
     glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* wnd)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            if (!window->m_EventCallback) return;
+            // if (!window->m_EventCallback) return;
 
             WindowCloseEvent ev{};
-            window->m_EventCallback(ev);
+            // window->m_EventCallback(ev);
+            EventBus::Publish(ev);
         });
 
     // -------- Key Events --------
     glfwSetKeyCallback(m_Window, [](GLFWwindow* wnd, int key, int sc, int action, int mods)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            if (!window->m_EventCallback) return;
+            // if (!window->m_EventCallback) return;
 
             if (action == GLFW_PRESS)
             {
                 KeyPressEvent ev(key, false);
-                window->m_EventCallback(ev);
+                // window->m_EventCallback(ev);
+                EventBus::Publish(ev);
             }
             else if (action == GLFW_REPEAT)
             {
                 KeyPressEvent ev(key, true);
-                window->m_EventCallback(ev);
+                // window->m_EventCallback(ev);
+                EventBus::Publish(ev);
             }
             else if (action == GLFW_RELEASE)
             {
                 KeyReleaseEvent ev(key);
-                window->m_EventCallback(ev);
+                // window->m_EventCallback(ev);
+                EventBus::Publish(ev);
             }
         });
 
@@ -181,17 +209,19 @@ void Window::InitCallbacks()
     glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* wnd, int button, int action, int mods)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            if (!window->m_EventCallback) return;
+            // if (!window->m_EventCallback) return;
 
             if (action == GLFW_PRESS)
             {
                 MouseButtonPressEvent ev(button);
-                window->m_EventCallback(ev);
+                // window->m_EventCallback(ev);
+                EventBus::Publish(ev);
             }
             else if (action == GLFW_RELEASE)
             {
                 MouseButtonReleaseEvent ev(button);
-                window->m_EventCallback(ev);
+                // window->m_EventCallback(ev);
+                EventBus::Publish(ev);
             }
         });
 
@@ -199,19 +229,21 @@ void Window::InitCallbacks()
     glfwSetCursorPosCallback(m_Window, [](GLFWwindow* wnd, double x, double y)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            if (!window->m_EventCallback) return;
+            // if (!window->m_EventCallback) return;
 
             MouseMoveEvent ev((float)x, (float)y);
-            window->m_EventCallback(ev);
+            // window->m_EventCallback(ev);
+            EventBus::Publish(ev);
         });
 
     // -------- Mouse Scroll --------
     glfwSetScrollCallback(m_Window, [](GLFWwindow* wnd, double x, double y)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            if (!window->m_EventCallback) return;
+            // if (!window->m_EventCallback) return;
 
             MouseScrollEvent ev((float)x, (float)y);
-            window->m_EventCallback(ev);
+            // window->m_EventCallback(ev);
+            EventBus::Publish(ev);
         });
 }
