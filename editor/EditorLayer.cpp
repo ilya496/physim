@@ -1,6 +1,6 @@
 #include "EditorLayer.h"
 
-#include <EventBus.h>
+#include "core/EventBus.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"

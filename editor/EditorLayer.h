@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Layer.h"
-#include "Window.h"
+#include "core/Window.h"
+#include "core/Layer.h"
 
 class EditorLayer : public Layer
 {

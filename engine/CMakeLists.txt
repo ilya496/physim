@@ -1,15 +1,15 @@
 add_library(engine STATIC
-    Shader.cpp
-    Model.cpp
-    Buffer.cpp
-    VertexArray.cpp
-    Application.cpp
-    Window.cpp
-    LayerStack.cpp
-    Timer.cpp
+    render/Shader.cpp
+    render/Model.cpp
+    render/Buffer.cpp
+    render/VertexArray.cpp
+    core/Application.cpp
+    core/Window.cpp
+    core/LayerStack.cpp
+    core/Timer.cpp
+    core/EventBus.cpp
     scene/Scene.cpp
     scene/Entity.cpp
-    EventBus.cpp
     asset/AssetManager.cpp
     asset/AssetImporter.cpp
     project/Project.cpp

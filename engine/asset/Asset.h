@@ -1,6 +1,6 @@
 #pragma once
 
-#include "UUID.h"
+#include "core/UUID.h"
 
 using AssetHandle = UUID;
 
