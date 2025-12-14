@@ -4,6 +4,8 @@
 #include "nlohmann/json.hpp"
 using json = nlohmann::json;
 
+#include <iostream>
+
 ProjectSerializer::ProjectSerializer(std::shared_ptr<Project> project)
     : m_Project(project)
 {
@@ -42,9 +44,17 @@ bool ProjectSerializer::Deserialize(const std::filesystem::path& filePath)
     std::ifstream in(filePath);
     if (!in.is_open())
         return false;
-
     nlohmann::json root;
-    in >> root;
+    try
+    {
+        in >> root;
+    }
+    catch (const nlohmann::json::parse_error& e)
+    {
+        // log: invalid project file
+        std::cout << e.what();
+        return false;
+    }
 
     if (!root.contains("Project"))
         return false;

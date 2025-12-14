@@ -1,6 +1,9 @@
 #include "EditorLayer.h"
 
 #include "core/EventBus.h"
+#include "project/Project.h"
+#include "utils/FileDialog.h"
+#include <iostream>
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
@@ -31,6 +34,20 @@ void EditorLayer::OnAttach()
     ImGui_ImplOpenGL3_Init("#version 460");
 
     SetupImGuiFonts("../JetBrainsMono-Regular.ttf");
+
+    m_RecentProjects = {
+        "Projects/TestProject/TestProject.physim",
+        "Projects/Sandbox/Sandbox.physim"
+    };
+
+    m_NewFrameSub = EventBus::Subscribe<NewFrameRenderedEvent>(
+        [this](const NewFrameRenderedEvent& e)
+        {
+            m_ViewportTexture = e.ColorAttachment;
+            m_ViewportWidth = e.Width;
+            m_ViewportHeight = e.Height;
+        }
+    );
 }
 
 void EditorLayer::OnDetach()
@@ -51,11 +68,15 @@ void EditorLayer::OnUpdate(float dt)
 
 void EditorLayer::OnRender()
 {
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0.39f, 0.58f, 0.93f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    DrawAssetsPanel();
+    if (m_State == EditorState::Launcher)
+    {
+        DrawLauncher();
+    }
+    else
+    {
+        DrawViewport();
+        DrawAssetsPanel();
+    }
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -117,6 +138,105 @@ void EditorLayer::BeginDockspace()
     ImGui::End();
 }
 
+void EditorLayer::DrawLauncher()
+{
+    ImGui::Begin("Physim Launcher", nullptr,
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoMove);
+
+    glm::ivec2 windowSize = m_Window->GetFramebufferSize();
+
+    ImGui::SetWindowSize(ImVec2(600, 400), ImGuiCond_Always);
+    ImGui::SetWindowPos(ImVec2(
+        (windowSize.x - 600) * 0.5f,
+        (windowSize.y - 400) * 0.5f));
+
+    ImGui::Text("Welcome to Physim");
+    ImGui::Separator();
+
+    DrawRecentProjects();
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    if (ImGui::Button("Open Project"))
+    {
+        // platform file dialog
+        auto path = FileDialog::OpenFile("Physim Project", "physim");
+        if (!path.empty())
+        {
+            std::cout << path.string();
+            OpenProject(path);
+        }
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("New Project"))
+    {
+        CreateNewProject();
+    }
+
+    ImGui::End();
+}
+
+void EditorLayer::DrawRecentProjects()
+{
+    ImGui::Text("Recent Projects");
+
+    for (const auto& project : m_RecentProjects)
+    {
+        if (ImGui::Selectable(project.filename().string().c_str()))
+        {
+            OpenProject(project);
+        }
+    }
+}
+
+void EditorLayer::OpenProject(const std::filesystem::path& path)
+{
+    if (Project::Load(path))
+    {
+        m_State = EditorState::Editor;
+        // Optional: add to recent list, save settings
+    }
+}
+
+void EditorLayer::CreateNewProject()
+{
+    auto folder = FileDialog::SelectFolder("New Project");
+    if (folder.empty())
+        return;
+
+    auto project = Project::New();
+    Project::SaveActive(folder / "NewProject.physim");
+
+    m_State = EditorState::Editor;
+}
+
 void EditorLayer::DrawAssetsPanel()
 {
+    ImGui::Begin("Asset");
+
+    ImGui::End();
+}
+
+void EditorLayer::DrawViewport()
+{
+    ImGui::Begin("Viewport");
+
+    if (m_ViewportTexture)
+    {
+        ImVec2 size = ImGui::GetContentRegionAvail();
+
+        ImGui::Image(
+            (ImTextureID)(uint64_t)m_ViewportTexture,
+            size,
+            ImVec2(0, 1),
+            ImVec2(1, 0)
+        );
+    }
+
+    ImGui::End();
 }
