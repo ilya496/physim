@@ -141,3 +141,18 @@ public:
 
     float X, Y;
 };
+
+class NewFrameRenderedEvent : public Event
+{
+public:
+    NewFrameRenderedEvent(uint32_t colorAttachment, uint32_t width, uint32_t height)
+        : ColorAttachment(colorAttachment), Width(width), Height(height) {
+    }
+
+    static EventType GetStaticType() { return EventType::NEW_FRAME_RENDERED_EVENT; }
+    virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "NEW_FRAME_RENDERED_EVENT"; }
+
+    uint32_t ColorAttachment;
+    uint32_t Width, Height;
+};

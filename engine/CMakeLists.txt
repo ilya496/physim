@@ -8,12 +8,14 @@ add_library(engine STATIC
     core/LayerStack.cpp
     core/Timer.cpp
     core/EventBus.cpp
+    core/RenderLayer.cpp
     scene/Scene.cpp
     scene/Entity.cpp
     asset/AssetManager.cpp
     asset/AssetImporter.cpp
     project/Project.cpp
     project/ProjectSerializer.cpp
+    utils/FileDialog.cpp
 )
 
 target_link_libraries(engine

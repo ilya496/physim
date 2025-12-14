@@ -35,10 +35,7 @@ void EditorLayer::OnAttach()
 
     SetupImGuiFonts("../JetBrainsMono-Regular.ttf");
 
-    m_RecentProjects = {
-        "Projects/TestProject/TestProject.physim",
-        "Projects/Sandbox/Sandbox.physim"
-    };
+    m_Settings = EditorSettings::Load();
 
     m_NewFrameSub = EventBus::Subscribe<NewFrameRenderedEvent>(
         [this](const NewFrameRenderedEvent& e)
@@ -125,11 +122,35 @@ void EditorLayer::BeginDockspace()
     {
         if (ImGui::BeginMenu("File"))
         {
-            if (ImGui::MenuItem("Exit"))
+            if (auto project = Project::GetActive())
             {
-                WindowCloseEvent e;
-                EventBus::Publish(e);
+                ImGui::TextDisabled("Project: %s", project->GetConfig().Name.c_str());
+                ImGui::Separator();
             }
+
+            if (ImGui::MenuItem("Save Project"))
+            {
+                // Project::SaveActive(...);
+            }
+
+            if (ImGui::MenuItem("Open Project..."))
+            {
+                auto path = FileDialog::OpenFile("Physim Project", "physim");
+                if (!path.empty())
+                    OpenProject(path);
+            }
+
+            bool hasProject = Project::GetActive() != nullptr;
+            if (ImGui::MenuItem("Close Project", nullptr, false, hasProject))
+            {
+                Project::GetActive().reset();
+                m_SelectedProject.clear();
+                m_State = EditorState::Launcher;
+            }
+
+            if (ImGui::MenuItem("Exit"))
+                EventBus::Publish(WindowCloseEvent{});
+
             ImGui::EndMenu();
         }
         ImGui::EndMenuBar();
@@ -140,52 +161,104 @@ void EditorLayer::BeginDockspace()
 
 void EditorLayer::DrawLauncher()
 {
-    ImGui::Begin("Physim Launcher", nullptr,
+    ImGui::Begin("Physim Launcher",
+        nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoMove);
 
-    glm::ivec2 windowSize = m_Window->GetFramebufferSize();
+    const ImVec2 size(800, 450);
+    auto fb = m_Window->GetFramebufferSize();
 
-    ImGui::SetWindowSize(ImVec2(600, 400), ImGuiCond_Always);
-    ImGui::SetWindowPos(ImVec2(
-        (windowSize.x - 600) * 0.5f,
-        (windowSize.y - 400) * 0.5f));
+    ImGui::SetWindowSize(size, ImGuiCond_Always);
+    ImGui::SetWindowPos(
+        ImVec2((fb.x - size.x) * 0.5f,
+            (fb.y - size.y) * 0.5f));
 
-    ImGui::Text("Welcome to Physim");
-    ImGui::Separator();
+    ImGui::Columns(2);
+    ImGui::SetColumnWidth(0, 520);
 
-    DrawRecentProjects();
-
+    ImGui::Text("Recent Projects");
     ImGui::Spacing();
-    ImGui::Spacing();
 
-    if (ImGui::Button("Open Project"))
+    ImGui::BeginChild("RecentProjects", ImVec2(0, 300), true);
+
+    for (const auto& project : m_Settings.RecentProjects)
     {
-        // platform file dialog
-        auto path = FileDialog::OpenFile("Physim Project", "physim");
-        if (!path.empty())
+        bool selected = (project == m_SelectedProject);
+
+        // Display name + full path to avoid ambiguity
+        std::string label =
+            project.filename().string() + "##" + project.string();
+
+        if (ImGui::Selectable(label.c_str(), selected,
+            ImGuiSelectableFlags_AllowDoubleClick,
+            ImVec2(0, 28)))
         {
-            std::cout << path.string();
-            OpenProject(path);
+            m_SelectedProject = project;
+
+            if (ImGui::IsMouseDoubleClicked(0))
+                OpenProject(project);
         }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", project.parent_path().string().c_str());
     }
 
-    ImGui::SameLine();
+    if (ImGui::IsWindowHovered() &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        !ImGui::IsAnyItemHovered())
+    {
+        m_SelectedProject.clear();
+    }
 
-    if (ImGui::Button("New Project"))
+    ImGui::EndChild();
+    ImGui::NextColumn();
+
+    ImGui::Text("Actions");
+    ImGui::Spacing();
+
+    if (ImGui::Button("Open Selected", ImVec2(-1, 0)))
+    {
+        if (!m_SelectedProject.empty())
+            OpenProject(m_SelectedProject);
+    }
+
+    if (ImGui::Button("Open Project...", ImVec2(-1, 0)))
+    {
+        auto path = FileDialog::OpenFile("Physim Project", "physim");
+        if (!path.empty())
+            OpenProject(path);
+    }
+
+    if (ImGui::Button("New Project...", ImVec2(-1, 0)))
     {
         CreateNewProject();
+    }
+
+    ImGui::Columns(1);
+    ImGui::Separator();
+
+    if (!m_SelectedProject.empty())
+    {
+        ImGui::TextDisabled("Selected:");
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", m_SelectedProject.string().c_str());
+    }
+    else
+    {
+        ImGui::TextDisabled("No project selected");
     }
 
     ImGui::End();
 }
 
+
 void EditorLayer::DrawRecentProjects()
 {
     ImGui::Text("Recent Projects");
 
-    for (const auto& project : m_RecentProjects)
+    for (const auto& project : m_Settings.RecentProjects)
     {
         if (ImGui::Selectable(project.filename().string().c_str()))
         {
@@ -198,8 +271,16 @@ void EditorLayer::OpenProject(const std::filesystem::path& path)
 {
     if (Project::Load(path))
     {
+        std::string title = "Physim Editor";
+        if (auto project = Project::GetActive())
+            title += " - " + project->GetConfig().Name;
+
+        m_Window->SetTitle(title.c_str());
+
+        m_Settings.AddRecentProject(path);
+        m_Settings.Save();
+
         m_State = EditorState::Editor;
-        // Optional: add to recent list, save settings
     }
 }
 

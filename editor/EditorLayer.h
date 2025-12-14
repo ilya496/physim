@@ -3,8 +3,7 @@
 #include "core/Window.h"
 #include "core/Layer.h"
 #include "core/EventBus.h"
-
-#include <filesystem>
+#include "EditorSettings.h"
 
 enum class EditorState
 {
@@ -38,7 +37,8 @@ private:
     Window* m_Window = nullptr;
     EditorState m_State = EditorState::Launcher;
 
-    std::vector<std::filesystem::path> m_RecentProjects;
+    EditorSettings m_Settings;
+    std::filesystem::path m_SelectedProject;
 
     uint32_t m_ViewportTexture = 0;
     uint32_t m_ViewportWidth = 0;

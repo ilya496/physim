@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include "Timer.h"
+#include "RenderLayer.h"
 
 Application::Application(WindowProps windowProps)
 {
@@ -14,6 +15,9 @@ Application::Application(WindowProps windowProps)
                 m_Running = false;
             }
         );
+
+    m_LayerStack.PushLayer(std::make_unique<RenderLayer>(800, 600));
+    std::cout << "render layer pushed";
 
     m_LastFrameTime = glfwGetTime();
 }
