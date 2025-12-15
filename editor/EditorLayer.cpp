@@ -143,7 +143,7 @@ void EditorLayer::BeginDockspace()
             bool hasProject = Project::GetActive() != nullptr;
             if (ImGui::MenuItem("Close Project", nullptr, false, hasProject))
             {
-                Project::GetActive().reset();
+                Project::Close();
                 m_SelectedProject.clear();
                 m_State = EditorState::Launcher;
             }
@@ -167,42 +167,103 @@ void EditorLayer::DrawLauncher()
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoMove);
 
-    const ImVec2 size(800, 450);
+    const ImVec2 windowSize(700, 400);
     auto fb = m_Window->GetFramebufferSize();
 
-    ImGui::SetWindowSize(size, ImGuiCond_Always);
+    ImGui::SetWindowSize(windowSize, ImGuiCond_Always);
     ImGui::SetWindowPos(
-        ImVec2((fb.x - size.x) * 0.5f,
-            (fb.y - size.y) * 0.5f));
+        ImVec2((fb.x - windowSize.x) * 0.5f,
+            (fb.y - windowSize.y) * 0.5f));
 
-    ImGui::Columns(2);
-    ImGui::SetColumnWidth(0, 520);
-
+    // ================= Header =================
     ImGui::Text("Recent Projects");
-    ImGui::Spacing();
 
-    ImGui::BeginChild("RecentProjects", ImVec2(0, 300), true);
+    const float buttonWidth = 120.0f;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float totalButtonWidth = buttonWidth * 2 + spacing;
 
-    for (const auto& project : m_Settings.RecentProjects)
+    float rightX =
+        ImGui::GetWindowContentRegionMax().x - totalButtonWidth;
+
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(rightX);
+
+    if (ImGui::Button("Open Project", ImVec2(buttonWidth, 0)))
     {
-        bool selected = (project == m_SelectedProject);
+        auto path = FileDialog::OpenFile("Physim Project", "physim");
+        if (!path.empty())
+            OpenProject(path);
+    }
 
-        // Display name + full path to avoid ambiguity
+    ImGui::SameLine();
+
+    if (ImGui::Button("New Project", ImVec2(buttonWidth, 0)))
+    {
+        CreateNewProject();
+    }
+
+    ImGui::Separator();
+
+    // ================= Recent Projects =================
+    ImGui::BeginChild("RecentProjects", ImVec2(0, 250), true);
+
+
+    for (int i = 0; i < (int)m_Settings.RecentProjects.size(); ++i)
+    {
+        const auto& project = m_Settings.RecentProjects[i];
+        bool selected = (i == m_SelectedProjectIndex);
+
         std::string label =
             project.filename().string() + "##" + project.string();
 
-        if (ImGui::Selectable(label.c_str(), selected,
-            ImGuiSelectableFlags_AllowDoubleClick,
+        if (ImGui::Selectable(
+            label.c_str(),
+            selected,
+            ImGuiSelectableFlags_AllowDoubleClick |
+            ImGuiSelectableFlags_SelectOnNav,
             ImVec2(0, 28)))
         {
+            m_SelectedProjectIndex = i;
             m_SelectedProject = project;
 
-            if (ImGui::IsMouseDoubleClicked(0))
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                 OpenProject(project);
         }
 
+        if (selected)
+            ImGui::SetItemDefaultFocus();
+
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", project.parent_path().string().c_str());
+        ImGui::TextDisabled("%s",
+            project.parent_path().string().c_str());
+    }
+
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+    {
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow))
+        {
+            if (m_SelectedProjectIndex > 0)
+                m_SelectedProjectIndex--;
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow))
+        {
+            if (m_SelectedProjectIndex + 1 < (int)m_Settings.RecentProjects.size())
+                m_SelectedProjectIndex++;
+        }
+
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
+            m_SelectedProjectIndex >= 0)
+        {
+            OpenProject(m_Settings.RecentProjects[m_SelectedProjectIndex]);
+        }
+
+        if (m_SelectedProjectIndex >= 0 &&
+            m_SelectedProjectIndex < (int)m_Settings.RecentProjects.size())
+        {
+            m_SelectedProject =
+                m_Settings.RecentProjects[m_SelectedProjectIndex];
+        }
     }
 
     if (ImGui::IsWindowHovered() &&
@@ -210,40 +271,30 @@ void EditorLayer::DrawLauncher()
         !ImGui::IsAnyItemHovered())
     {
         m_SelectedProject.clear();
+        m_SelectedProjectIndex = -1;
     }
 
     ImGui::EndChild();
-    ImGui::NextColumn();
 
-    ImGui::Text("Actions");
-    ImGui::Spacing();
-
-    if (ImGui::Button("Open Selected", ImVec2(-1, 0)))
-    {
-        if (!m_SelectedProject.empty())
-            OpenProject(m_SelectedProject);
-    }
-
-    if (ImGui::Button("Open Project...", ImVec2(-1, 0)))
-    {
-        auto path = FileDialog::OpenFile("Physim Project", "physim");
-        if (!path.empty())
-            OpenProject(path);
-    }
-
-    if (ImGui::Button("New Project...", ImVec2(-1, 0)))
-    {
-        CreateNewProject();
-    }
-
-    ImGui::Columns(1);
     ImGui::Separator();
 
     if (!m_SelectedProject.empty())
     {
-        ImGui::TextDisabled("Selected:");
+        ImGui::TextDisabled("Selected Project");
+
+        ImGui::Spacing();
+
+        ImGui::Text("Name:");
         ImGui::SameLine();
-        ImGui::TextWrapped("%s", m_SelectedProject.string().c_str());
+        ImGui::Text("%s", m_SelectedProject.filename().string().c_str());
+
+        ImGui::Text("Path:");
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s",
+            m_SelectedProject.parent_path().string().c_str());
+
+        auto lastWrite =
+            std::filesystem::last_write_time(m_SelectedProject);
     }
     else
     {
@@ -252,7 +303,6 @@ void EditorLayer::DrawLauncher()
 
     ImGui::End();
 }
-
 
 void EditorLayer::DrawRecentProjects()
 {

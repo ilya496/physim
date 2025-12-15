@@ -42,3 +42,15 @@ bool Project::SaveActive(const std::filesystem::path& path)
 
     return false;
 }
+
+void Project::Close()
+{
+    if (s_ActiveProject)
+    {
+        if (s_ActiveProject->m_AssetManager)
+        {
+            s_ActiveProject->m_AssetManager.reset();
+        }
+        s_ActiveProject.reset();
+    }
+}

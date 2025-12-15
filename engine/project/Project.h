@@ -52,6 +52,8 @@ public:
     static std::shared_ptr<Project> New();
     static std::shared_ptr<Project> Load(const std::filesystem::path& path);
     static bool SaveActive(const std::filesystem::path& path);
+    static void Close();
+
 private:
     ProjectConfig m_Config;
     std::filesystem::path m_ProjectDirectory;

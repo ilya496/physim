@@ -20,10 +20,22 @@ EditorSettings EditorSettings::Load()
     nlohmann::json j;
     in >> j;
 
-    for (auto& p : j["RecentProjects"])
-        settings.RecentProjects.emplace_back(p.get<std::string>());
+    if (j.contains("RecentProjects"))
+    {
+        for (auto& p : j["RecentProjects"])
+        {
+            auto str = p.get<std::string>();
+            if (!str.empty())
+                settings.RecentProjects.emplace_back(str);
+        }
+    }
 
-    settings.LastProject = j.value("LastProject", "");
+    if (j.contains("LastProject"))
+    {
+        auto str = j["LastProject"].get<std::string>();
+        if (!str.empty())
+            settings.LastProject = str;
+    }
 
     return settings;
 }
@@ -34,9 +46,16 @@ void EditorSettings::Save() const
     std::filesystem::create_directories(path.parent_path());
 
     nlohmann::json j;
-    j["LastProject"] = LastProject.string();
-    for (auto& p : RecentProjects)
-        j["RecentProjects"].push_back(p.string());
+
+    if (!LastProject.empty())
+        j["LastProject"] = LastProject.string();
+
+    j["RecentProjects"] = nlohmann::json::array();
+    for (const auto& p : RecentProjects)
+    {
+        if (!p.empty())
+            j["RecentProjects"].push_back(p.string());
+    }
 
     std::ofstream out(path);
     out << j.dump(4);
@@ -44,15 +63,34 @@ void EditorSettings::Save() const
 
 void EditorSettings::AddRecentProject(const std::filesystem::path& path)
 {
-    RecentProjects.erase(
-        std::remove(RecentProjects.begin(), RecentProjects.end(), path),
-        RecentProjects.end()
-    );
+    if (path.empty())
+        return;
 
-    RecentProjects.insert(RecentProjects.begin(), path);
+    std::filesystem::path normalized = std::filesystem::weakly_canonical(path);
 
-    if (RecentProjects.size() > 10)
-        RecentProjects.resize(10);
+    // remove empty entries and duplicates
+    for (auto it = RecentProjects.begin(); it != RecentProjects.end(); )
+    {
+        if (it->empty())
+        {
+            it = RecentProjects.erase(it);
+            continue;
+        }
 
-    LastProject = path;
+        if (std::filesystem::equivalent(*it, normalized))
+        {
+            it = RecentProjects.erase(it);
+            continue;
+        }
+
+        ++it;
+    }
+
+    RecentProjects.insert(RecentProjects.begin(), normalized);
+
+    while (RecentProjects.size() > 10)
+        RecentProjects.pop_back();
+
+    LastProject = normalized;
 }
+

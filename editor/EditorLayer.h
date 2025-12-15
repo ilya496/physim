@@ -39,6 +39,7 @@ private:
 
     EditorSettings m_Settings;
     std::filesystem::path m_SelectedProject;
+    int m_SelectedProjectIndex = -1;
 
     uint32_t m_ViewportTexture = 0;
     uint32_t m_ViewportWidth = 0;
