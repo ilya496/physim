@@ -4,6 +4,7 @@
 #include "core/Layer.h"
 #include "core/EventBus.h"
 #include "EditorSettings.h"
+#include "LauncherPanel.h"
 
 enum class EditorState
 {
@@ -28,8 +29,6 @@ private:
     void DrawAssetsPanel();
     void DrawViewport();
 
-    void DrawLauncher();
-    void DrawRecentProjects();
     void OpenProject(const std::filesystem::path& path);
     void CreateNewProject();
 
@@ -38,8 +37,7 @@ private:
     EditorState m_State = EditorState::Launcher;
 
     EditorSettings m_Settings;
-    std::filesystem::path m_SelectedProject;
-    int m_SelectedProjectIndex = -1;
+    std::unique_ptr<LauncherPanel> m_LauncherPanel;
 
     uint32_t m_ViewportTexture = 0;
     uint32_t m_ViewportWidth = 0;
