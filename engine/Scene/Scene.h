@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include "entt.hpp"
+#include <entt/entity/registry.hpp>
 
 #include "core/UUID.h"
 #include "Components.h"
@@ -14,9 +14,12 @@ public:
     Scene();
     ~Scene();
 
-    Entity CreateEntity(const std::string& name = std::string());
+    std::shared_ptr<Scene> Copy() const;
 
+    Entity CreateEntity(const std::string& name = std::string());
     Entity CreateEntityWithUUID(const UUID& uuid, const std::string& name = std::string());
+    Entity CreateMeshEntity(const std::string& name, AssetHandle meshHandle, AssetHandle materialHandle);
+    Entity CreateLightEntity(const std::string& name);
 
     void DestroyEntity(Entity entity);
 

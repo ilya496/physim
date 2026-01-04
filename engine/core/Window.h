@@ -3,6 +3,7 @@
 #include <string>
 #include <functional>
 #include <glm/glm.hpp>
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 // #include "Event.h"
@@ -62,4 +63,6 @@ private:
 
     bool m_IsFullscreen = false;
     GLFWmonitor* m_PreviousMonitor = nullptr;
+
+    glm::vec2 m_LastMousePos;
 };

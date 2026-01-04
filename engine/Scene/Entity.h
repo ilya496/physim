@@ -1,11 +1,11 @@
 #pragma once
 
 #include <string>
-#include "entt.hpp"
+#include <entt/entity/registry.hpp>
 
 #include "core/UUID.h"
-#include "scene/Components.h"
-#include "scene/Scene.h"
+#include "Components.h"
+#include "Scene.h"
 
 class Entity
 {

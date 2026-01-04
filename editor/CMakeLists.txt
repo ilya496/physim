@@ -3,6 +3,9 @@ add_executable(Physim
     EditorLayer.cpp
     EditorSettings.cpp
     LauncherPanel.cpp
+    InspectorPanel.cpp
+    AssetPanel.cpp
+    SceneHierarchyPanel.cpp
 )
 
 target_link_libraries(Physim PRIVATE engine)

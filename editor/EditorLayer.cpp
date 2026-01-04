@@ -4,6 +4,8 @@
 #include "project/Project.h"
 #include "utils/FileDialog.h"
 #include <iostream>
+#include "core/Input.h"
+#include "EditorContext.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
@@ -37,6 +39,9 @@ void EditorLayer::OnAttach()
 
     m_Settings = EditorSettings::Load();
     m_LauncherPanel = std::make_unique<LauncherPanel>(m_Settings);
+    m_InspectorPanel = std::make_unique<InspectorPanel>();
+    m_AssetPanel = std::make_unique<AssetPanel>();
+    m_SceneHierarchyPanel = std::make_unique<SceneHierarchyPanel>();
 
     m_NewFrameSub = EventBus::Subscribe<NewFrameRenderedEvent>(
         [this](const NewFrameRenderedEvent& e)
@@ -61,7 +66,27 @@ void EditorLayer::OnUpdate(float dt)
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    if (m_ViewportHovered)
+    {
+        if (Input::IsKeyPressed(KeyCode::G))
+            m_GizmoMode = GizmoMode::Translate;
+
+        if (Input::IsKeyPressed(KeyCode::R))
+            m_GizmoMode = GizmoMode::Rotate;
+
+        if (Input::IsKeyPressed(KeyCode::S))
+            m_GizmoMode = GizmoMode::Scale;
+
+        if (Input::IsKeyPressed(KeyCode::Escape) || Input::MouseButtonPressed(MouseCode::ButtonLeft))
+            m_GizmoMode = GizmoMode::None;
+    }
+
     BeginDockspace();
+}
+
+void EditorLayer::OnFixedUpdate(float dt)
+{
+    m_SceneController.Update(dt);
 }
 
 void EditorLayer::OnRender()
@@ -72,12 +97,16 @@ void EditorLayer::OnRender()
         {
             OpenProject(*projectPath);
             m_State = EditorState::Editor;
+            m_SceneController.SetEditorScene(Project::GetActive()->GetActiveScene());
         }
     }
     else
     {
         DrawViewport();
-        DrawAssetsPanel();
+        DrawToolbar();
+        m_AssetPanel->Draw(Project::GetActive()->GetActiveScene());
+        m_InspectorPanel->Draw(Project::GetActive()->GetActiveScene());
+        m_SceneHierarchyPanel->Draw(Project::GetActive()->GetActiveScene());
     }
 
     ImGui::Render();
@@ -193,28 +222,115 @@ void EditorLayer::CreateNewProject()
     m_State = EditorState::Editor;
 }
 
-void EditorLayer::DrawAssetsPanel()
+void EditorLayer::DrawToolbar()
 {
-    ImGui::Begin("Asset");
+    ImGui::Begin("Toolbar", nullptr);
+
+    if (ImGui::Button("Play"))
+        m_SceneController.Play();
+
+    ImGui::SameLine();
+    if (ImGui::Button("Pause"))
+        m_SceneController.Pause();
+
+    ImGui::SameLine();
+    if (ImGui::Button("Stop"))
+        m_SceneController.Stop();
 
     ImGui::End();
 }
 
+
 void EditorLayer::DrawViewport()
 {
-    ImGui::Begin("Viewport");
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 
+    ImGui::Begin("Viewport", nullptr,
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoFocusOnAppearing);
+
+    ImVec2 viewportMin = ImGui::GetCursorScreenPos();
+    ImVec2 viewportSize = ImGui::GetContentRegionAvail();
+    ImVec2 viewportMax = {
+        viewportMin.x + viewportSize.x,
+        viewportMin.y + viewportSize.y
+    };
+
+    // Draw image FIRST
     if (m_ViewportTexture)
     {
-        ImVec2 size = ImGui::GetContentRegionAvail();
-
-        ImGui::Image(
+        ImGui::GetWindowDrawList()->AddImage(
             (ImTextureID)(uint64_t)m_ViewportTexture,
-            size,
+            viewportMin,
+            viewportMax,
             ImVec2(0, 1),
             ImVec2(1, 0)
         );
     }
 
+
+    ImVec2 mousePos = ImGui::GetMousePos();
+    bool hovered =
+        mousePos.x >= viewportMin.x &&
+        mousePos.x <= viewportMax.x &&
+        mousePos.y >= viewportMin.y &&
+        mousePos.y <= viewportMax.y;
+
+    ImGui::InvisibleButton("##ViewportDropTarget", viewportSize,
+        ImGuiButtonFlags_MouseButtonLeft |
+        ImGuiButtonFlags_MouseButtonRight);
+
+    // drag&drop
+    bool dragHover = false;
+
+    if (ImGui::BeginDragDropTarget())
+    {
+        if (const ImGuiPayload* payload =
+            ImGui::AcceptDragDropPayload(
+                "CONTENT_BROWSER_ITEM",
+                ImGuiDragDropFlags_AcceptBeforeDelivery))
+        {
+            dragHover = true;
+
+            if (payload->IsDelivery())
+            {
+                AssetHandle handle = *(AssetHandle*)payload->Data;
+                auto project = Project::GetActive();
+                auto assetManager = project->GetAssetManager();
+                project->GetActiveScene()->CreateMeshEntity("New Mesh", handle, assetManager->GetDefaultMaterial());
+                // ImportMesh(path);
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+
+    if (dragHover)
+    {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+        drawList->AddRect(
+            viewportMin,
+            viewportMax,
+            IM_COL32(80, 160, 255, 220), // blue highlight
+            0.0f,
+            0,
+            2.0f
+        );
+    }
+
+    EventBus::Publish(ViewportEvent{
+        mousePos.x,
+        mousePos.y,
+        viewportMin.x,
+        viewportMin.y,
+        viewportSize.x,
+        viewportSize.y,
+        hovered
+        });
+
+    m_ViewportHovered = hovered;
+
     ImGui::End();
+    ImGui::PopStyleVar(2);
 }

@@ -2,6 +2,7 @@
 
 #include "imgui.h"
 #include "utils/FileDialog.h"
+#include <iostream>
 
 LauncherPanel::LauncherPanel(EditorSettings& settings)
     : m_Settings(settings)
@@ -46,6 +47,12 @@ std::optional<std::filesystem::path> LauncherPanel::Draw(const glm::ivec2& fb)
         if (!folder.empty())
             result = folder / "NewProject.physim";
         m_RequestNewProject = false;
+    }
+
+    if (m_OpenRequested)
+    {
+        result = m_OpenRequested;
+        m_OpenRequested.reset();
     }
 
     ImGui::End();
@@ -94,53 +101,31 @@ void LauncherPanel::DrawRecentProjects()
             ImGuiSelectableFlags_SelectOnNav,
             ImVec2(0, 28)))
         {
-            m_SelectedProjectIndex = i;
-            m_SelectedProject = project;
+            SelectProject(i, project);
 
             if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                m_RequestOpenFile = false, m_RequestNewProject = false;
+                m_OpenRequested = project;
         }
+
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", project.parent_path().string().c_str());
 
         if (selected)
             ImGui::SetItemDefaultFocus();
-
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s",
-            project.parent_path().string().c_str());
     }
 
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-    {
-        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_SelectedProjectIndex > 0)
-            m_SelectedProjectIndex--;
-
-        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) &&
-            m_SelectedProjectIndex + 1 < (int)m_Settings.RecentProjects.size())
-            m_SelectedProjectIndex++;
-
-        if (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
-            m_SelectedProjectIndex >= 0)
-        {
-            m_SelectedProject =
-                m_Settings.RecentProjects[m_SelectedProjectIndex];
-            m_RequestOpenFile = false;
-        }
-
-        if (m_SelectedProjectIndex >= 0)
-            m_SelectedProject =
-            m_Settings.RecentProjects[m_SelectedProjectIndex];
-    }
+    HandleKeyboardNavigation();
 
     if (ImGui::IsWindowHovered() &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
         !ImGui::IsAnyItemHovered())
     {
-        m_SelectedProject.clear();
-        m_SelectedProjectIndex = -1;
+        ClearSelection();
     }
 
     ImGui::EndChild();
 }
+
 
 void LauncherPanel::DrawFooter()
 {
@@ -161,5 +146,47 @@ void LauncherPanel::DrawFooter()
     else
     {
         ImGui::TextDisabled("No project selected");
+    }
+}
+
+void LauncherPanel::SelectProject(int index, const std::filesystem::path& path)
+{
+    m_SelectedProjectIndex = index;
+    m_SelectedProject = path;
+}
+
+void LauncherPanel::ClearSelection()
+{
+    m_SelectedProjectIndex = -1;
+    m_SelectedProject.clear();
+}
+
+void LauncherPanel::HandleKeyboardNavigation()
+{
+    if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+        return;
+
+    const int count = (int)m_Settings.RecentProjects.size();
+
+    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow) && m_SelectedProjectIndex > 0)
+        --m_SelectedProjectIndex;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow) &&
+        m_SelectedProjectIndex + 1 < count)
+        ++m_SelectedProjectIndex;
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Enter) &&
+        m_SelectedProjectIndex >= 0 &&
+        m_SelectedProjectIndex < count)
+    {
+        m_OpenRequested =
+            m_Settings.RecentProjects[m_SelectedProjectIndex];
+    }
+
+    if (m_SelectedProjectIndex >= 0 &&
+        m_SelectedProjectIndex < count)
+    {
+        m_SelectedProject =
+            m_Settings.RecentProjects[m_SelectedProjectIndex];
     }
 }

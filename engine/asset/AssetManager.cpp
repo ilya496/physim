@@ -4,12 +4,17 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
+#include <iostream>
 
 static std::unordered_map<std::filesystem::path, AssetType> s_AssetExtensionMap = {
-    { ".scene", AssetType::Scene },
     { ".png", AssetType::Texture },
     { ".jpg", AssetType::Texture },
-    { ".jpeg", AssetType::Texture }
+    { ".jpeg", AssetType::Texture },
+    { ".obj", AssetType::Mesh },
+    { ".stl", AssetType::Mesh },
+    { ".gltf", AssetType::Mesh },
+    { ".glb", AssetType::Mesh },
+    { ".mat", AssetType::Material }
 };
 
 static AssetType GetAssetTypeFromFileExtension(const std::filesystem::path& extension)
@@ -37,11 +42,9 @@ bool AssetManager::IsAssetLoaded(AssetHandle handle) const
 
 std::shared_ptr<Asset> AssetManager::GetAsset(AssetHandle handle)
 {
-    // 1. check if handle is valid
     if (!IsAssetHandleValid(handle))
         return nullptr;
 
-    // 2. check if asset needs load (and if so, load) 
     std::shared_ptr<Asset> asset;
     if (IsAssetLoaded(handle))
     {
@@ -49,17 +52,16 @@ std::shared_ptr<Asset> AssetManager::GetAsset(AssetHandle handle)
     }
     else
     {
-        // load asset
         const AssetMetadata& metadata = GetMetadata(handle);
         asset = AssetImporter::ImportAsset(handle, metadata);
         if (!asset) {} // import failed
+        m_LoadedAssets[handle] = asset;
     }
 
-    // 3. return asset
     return asset;
 }
 
-void AssetManager::ImportAsset(const std::filesystem::path& filePath)
+AssetHandle AssetManager::ImportAsset(const std::filesystem::path& filePath)
 {
     AssetHandle handle;
     AssetMetadata metadata;
@@ -67,7 +69,7 @@ void AssetManager::ImportAsset(const std::filesystem::path& filePath)
     metadata.Type = GetAssetTypeFromFileExtension(filePath.extension());
 
     if (metadata.Type == AssetType::None)
-        return;
+        return handle;
 
     std::shared_ptr<Asset> asset = AssetImporter::ImportAsset(handle, metadata);
     if (asset)
@@ -77,6 +79,43 @@ void AssetManager::ImportAsset(const std::filesystem::path& filePath)
         m_AssetRegistry[handle] = metadata;
         SerializeAssetRegistry();
     }
+
+    return handle;
+}
+
+AssetHandle AssetManager::CreateMaterial(const MaterialDesc& desc)
+{
+    AssetHandle handle;
+
+    std::filesystem::path path = "materials/" + handle.string() + ".mat";
+
+    SerializeMaterial(desc, path);
+
+    AssetMetadata metadata;
+    metadata.Type = AssetType::Material;
+    metadata.FilePath = path;
+
+    m_AssetRegistry.emplace(handle, metadata);
+    SerializeAssetRegistry();
+
+    return handle;
+}
+
+AssetHandle AssetManager::GetDefaultMaterial()
+{
+    static AssetHandle s_DefaultMaterial = 0;
+
+    if (s_DefaultMaterial != 0)
+        return s_DefaultMaterial;
+
+    MaterialDesc desc;
+    desc.DiffuseColor = { 0.21f, 0.27f, 0.31f };
+    desc.SpecularColor = { 0.21f, 0.27f, 0.31f };
+    desc.Shininess = 32.0f;
+    desc.DiffuseMap = 0;
+
+    s_DefaultMaterial = CreateMaterial(desc);
+    return s_DefaultMaterial;
 }
 
 AssetType AssetManager::GetAssetType(AssetHandle handle) const
@@ -102,10 +141,21 @@ const std::filesystem::path& AssetManager::GetFilePath(AssetHandle handle) const
     return GetMetadata(handle).FilePath;
 }
 
+void AssetManager::SerializeMaterial(const MaterialDesc& desc, const std::filesystem::path& path)
+{
+    json j;
+    j["DiffuseColor"] = { desc.DiffuseColor.r, desc.DiffuseColor.g, desc.DiffuseColor.b };
+    j["SpecularColor"] = { desc.SpecularColor.r, desc.SpecularColor.g, desc.SpecularColor.b };
+    j["Shininess"] = desc.Shininess;
+    j["DiffuseMap"] = desc.DiffuseMap.string();
+
+    std::ofstream out(Project::GetActiveAssetFileSystemPath(path));
+    out << j.dump(4);
+}
+
 void AssetManager::SerializeAssetRegistry()
 {
-    // auto path = Project::GetActiveAssetRegistryPath();
-    auto path = "AssetRegistry.json";
+    std::filesystem::path registryPath = Project::GetActiveAssetRegistryPath();
 
     json root;
     root["AssetRegistry"] = json::array();
@@ -120,17 +170,19 @@ void AssetManager::SerializeAssetRegistry()
         root["AssetRegistry"].push_back(std::move(entry));
     }
 
-    std::ofstream fout(path);
+    std::ofstream fout(registryPath);
     if (fout.is_open())
         fout << root.dump(4);
 }
 
 bool AssetManager::DeserializeAssetRegistry()
 {
-    if (!std::filesystem::exists(m_RegistryPath))
+    std::filesystem::path registryPath = Project::GetActiveAssetRegistryPath();
+
+    if (!std::filesystem::exists(registryPath))
         return false;
 
-    std::ifstream stream(m_RegistryPath);
+    std::ifstream stream(registryPath);
     if (!stream.is_open())
         return false;
 

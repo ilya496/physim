@@ -13,8 +13,11 @@ public:
     virtual ~Application() = default;
 
     void Run();
-
     void PushLayer(std::unique_ptr<Layer> layer);
+
+    Window& GetWindow() { return *m_Window; }
+
+    static Application& Get() { return *s_Instance; }
 
 protected:
     virtual void Shutdown() {}
@@ -29,6 +32,7 @@ protected:
     double m_TotalTime = 0.0;
 
 private:
+    static Application* s_Instance;
     bool m_Running = true;
 
     EventBus::Subscription m_WindowCloseSub;

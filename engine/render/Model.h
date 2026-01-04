@@ -3,10 +3,59 @@
 #include <string>
 #include <vector>
 #include <glm/glm.hpp>
+#include <filesystem>
+#include <memory>
+
 #include "Shader.h"
-#include <glad/glad.h>
 #include "Buffer.h"
 #include "VertexArray.h"
+#include "asset/Asset.h"
+#include "project/Project.h"
+#include "asset/AssetManager.h"
+
+class Texture;
+class Mesh;
+class Material;
+
+class TextureAsset : public Asset
+{
+public:
+    virtual AssetType GetType() const override { return AssetType::Texture; }
+
+    std::shared_ptr<Texture> TextureData;
+};
+
+class MeshAsset : public Asset
+{
+public:
+    virtual AssetType GetType() const override { return AssetType::Mesh; }
+
+    std::shared_ptr<Mesh> MeshData;
+};
+
+class MaterialAsset : public Asset
+{
+public:
+    virtual AssetType GetType() const override { return AssetType::Material; }
+
+    std::shared_ptr<Material> MaterialData;
+};
+
+// struct ShaderSource
+// {
+//     std::filesystem::path Vertex;
+//     std::filesystem::path Fragment;
+//     std::filesystem::path Geometry;
+// };
+
+// class ShaderAsset : public Asset
+// {
+// public:
+//     virtual AssetType GetType() const override { return AssetType::Shader; }
+
+//     ShaderSource Sources;
+//     std::shared_ptr<Shader> ShaderData;
+// };
 
 enum class MeshPrimitive { CUBE, PLANE, UV_SPHERE, ICO_SPHERE, CYLINDER };
 
@@ -15,23 +64,22 @@ struct Vertex
     glm::vec3 Position;
     glm::vec3 Normal;
     glm::vec2 TexCoords;
-    glm::vec3 Tangent;
-    glm::vec3 Bitangent;
 };
 
 class Texture
 {
 public:
-    Texture(const std::string& path, bool flipVertically = true);
+    explicit Texture(const std::filesystem::path& path, bool flipVertically = true);
     ~Texture();
 
     void Bind(uint32_t slot = 0) const;
     void Unbind() const;
 
-    uint32_t GetID() const { return m_RendererID; }
-    int GetWidth() const { return m_Width; }
-    int GetHeight() const { return m_Height; }
-    const std::string& GetPath() const { return m_Path; }
+    uint32_t GetRendererID() const { return m_RendererID; }
+    uint32_t GetWidth() const { return m_Width; }
+    uint32_t GetHeight() const { return m_Height; }
+    uint32_t GetChannels() const { return m_Channels; }
+    const std::filesystem::path& GetPath() const { return m_Path; }
 
     static std::shared_ptr<Texture> Create(const std::string& path, bool flipVertically = true)
     {
@@ -39,58 +87,163 @@ public:
     }
 
 private:
+    void LoadFromFile(const std::filesystem::path& path, bool flipVertically);
+
+private:
     uint32_t m_RendererID = 0;
-    std::string m_Path;
-    int m_Width = 0;
-    int m_Height = 0;
-    int m_Channels = 0;
+    uint32_t m_Width = 0;
+    uint32_t m_Height = 0;
+    uint32_t m_Channels = 0;
+
+    GLenum m_InternalFormat = 0;
+    GLenum m_DataFormat = 0;
+
+    std::filesystem::path m_Path;
 };
+
+struct FrameData
+{
+    glm::mat4 View;
+    glm::mat4 Projection;
+    glm::vec3 CameraPosition;
+};
+
+// class Material
+// {
+// public:
+//     virtual ~Material() = default;
+
+//     virtual void Bind(const Shader& shader) const = 0;
+//     // virtual const Shader& GetShader() const = 0;
+// };
+
+// class PhongMaterial : public Material
+// {
+// public:
+//     PhongMaterial()
+//         // : m_ShaderHandle(shaderHandle)
+//     {
+//     }
+
+//     void Bind(const Shader& shader) const override
+//     {
+//         // const Shader& shader = GetShader();
+//         shader.Bind();
+
+//         // Frame uniforms
+//         // shader.SetMat4f("u_View", frame.View);
+//         // shader.SetMat4f("u_Projection", frame.Projection);
+//         // shader.SetVec3f("u_ViewPos", frame.CameraPosition);
+
+//         // Material uniforms
+//         shader.SetVec3f("material_diffuseColor", DiffuseColor);
+//         shader.SetVec3f("material_specularColor", SpecularColor);
+//         shader.Set1f("material_shininess", Shininess);
+
+//         BindTextures(shader);
+//     }
+// private:
+//     void BindTextures(const Shader& shader) const
+//     {
+//         auto assetManager = Project::GetActive()->GetAssetManager();
+//         uint32_t slot = 0;
+
+//         shader.Set1i("material_hasDiffuseMap", assetManager->IsAssetHandleValid(DiffuseMap));
+//         // shader.Set1i("material_hasSpecularMap", assetManager->IsAssetHandleValid(SpecularMap));
+
+//         if (assetManager->IsAssetHandleValid(DiffuseMap))
+//         {
+//             auto tex = GetTexture(DiffuseMap);
+//             tex->Bind(slot);
+//             shader.Set1i("material_diffuseMap", slot++);
+//         }
+
+//         // if (assetManager->IsAssetHandleValid(SpecularMap))
+//         // {
+//         //     auto tex = GetTexture(SpecularMap);
+//         //     tex->Bind(slot);
+//         //     shader.Set1i("material_specularMap", slot++);
+//         // }
+//     }
+
+//     // const Shader& GetShader() const override
+//     // {
+//     //     auto shaderAsset = AssetManager::GetAsset<ShaderAsset>(m_ShaderHandle);
+//     //     return *shaderAsset->ShaderData;
+//     // }
+
+//     std::shared_ptr<Texture> GetTexture(AssetHandle handle) const
+//     {
+//         auto texAsset = AssetManager::GetAsset<TextureAsset>(handle);
+//         return texAsset->TextureData;
+//     }
+
+// public:
+//     glm::vec3 DiffuseColor = glm::vec3(1.0f, 1.0f, 1.0f);
+//     glm::vec3 SpecularColor = glm::vec3(1.0f, 1.0f, 1.0f);
+//     float Shininess = 32.0f;
+
+//     AssetHandle DiffuseMap;
+//     // AssetHandle SpecularMap;
+
+//     // private:
+//         // AssetHandle m_ShaderHandle;
+// };
 
 class Material
 {
 public:
-    virtual ~Material() = default;
-    virtual void Apply(const Shader& shader) const = 0;
-};
+    Material() = default;
 
-class PhongMaterial : public Material
-{
-public:
-    void Apply(const Shader& shader) const override
+    void Bind(const Shader& shader) const
     {
         shader.Bind();
-        shader.SetVec3f("material.diffuseColor", DiffuseColor);
-        shader.SetVec3f("material.specularColor", SpecularColor);
-        shader.Set1f("material.shininess", Shininess);
-        shader.Set1i("material.hasDiffuseMap", DiffuseMap ? 1 : 0);
-        shader.Set1i("material.hasSpecularMap", SpecularMap ? 1 : 0);
-        shader.Set1i("material.hasNormalMap", NormalMap ? 1 : 0);
+        shader.SetVec3f("material_diffuseColor", DiffuseColor);
+        shader.SetVec3f("material_specularColor", SpecularColor);
+        shader.Set1f("material_shininess", Shininess);
 
-        uint32_t textureSlot = 0;
+        auto assetManager = Project::GetActive()->GetAssetManager();
+        uint32_t slot = 0;
 
-        if (DiffuseMap) {
-            DiffuseMap->Bind(textureSlot);
-            shader.Set1i("material.diffuseMap", textureSlot++);
+        shader.Set1i("material_hasDiffuseMap", assetManager->IsAssetHandleValid(DiffuseMap));
+        // shader.Set1i("material_hasSpecularMap", assetManager->IsAssetHandleValid(SpecularMap));
+
+        if (assetManager->IsAssetHandleValid(DiffuseMap))
+        {
+            auto tex = GetTexture(DiffuseMap);
+            tex->Bind(slot);
+            shader.Set1i("material_diffuseMap", slot++);
         }
 
-        if (SpecularMap) {
-            SpecularMap->Bind(textureSlot);
-            shader.Set1i("material.specularMap", textureSlot++);
-        }
-
-        if (NormalMap) {
-            NormalMap->Bind(textureSlot);
-            shader.Set1i("material.normalMap", textureSlot++);
-        }
+        // if (assetManager->IsAssetHandleValid(SpecularMap))
+        // {
+        //     auto tex = GetTexture(SpecularMap);
+        //     tex->Bind(slot);
+        //     shader.Set1i("material_specularMap", slot++);
+        // }
     }
-public:
-    glm::vec3 DiffuseColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    glm::vec3 SpecularColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    float Shininess = 32.0f;
 
-    std::shared_ptr<Texture> DiffuseMap;
-    std::shared_ptr<Texture> SpecularMap;
-    std::shared_ptr<Texture> NormalMap;
+    void ApplyDescription(const MaterialDesc& desc)
+    {
+        DiffuseColor = desc.DiffuseColor;
+        SpecularColor = desc.SpecularColor;
+        Shininess = desc.Shininess;
+        DiffuseMap = desc.DiffuseMap;
+    }
+private:
+    std::shared_ptr<Texture> GetTexture(AssetHandle handle) const
+    {
+        auto texAsset = AssetManager::GetAsset<TextureAsset>(handle);
+        return texAsset->TextureData;
+    }
+
+public:
+    glm::vec3 DiffuseColor;
+    glm::vec3 SpecularColor;
+    float Shininess;
+
+    AssetHandle DiffuseMap = 0;
+    // AssetHandle SpecularMap;
 };
 
 inline BufferLayout CreateVertexBufferLayout()
@@ -99,42 +252,63 @@ inline BufferLayout CreateVertexBufferLayout()
         { ShaderDataType::Float3, "a_Position" },
         { ShaderDataType::Float3, "a_Normal" },
         { ShaderDataType::Float2, "a_TexCoords" },
-        { ShaderDataType::Float3, "a_Tangent" },
-        { ShaderDataType::Float3, "a_Bitangent" }
     };
 }
 
-class Geometry
+// class Geometry
+// {
+// public:
+//     Geometry(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+
+// public:
+//     void Bind() const;
+//     void Unbind() const;
+//     uint32_t GetIndexCount() const { return m_IndexBuffer->GetCount(); }
+//     static std::shared_ptr<Geometry> Generate(MeshPrimitive primitive);
+
+// private:
+//     static std::shared_ptr<Geometry> GenerateCube();
+//     static std::shared_ptr<Geometry> GeneratePlane();
+
+//     std::shared_ptr<VertexArray> m_VertexArray;
+//     std::shared_ptr<VertexBuffer> m_VertexBuffer;
+//     std::shared_ptr<IndexBuffer> m_IndexBuffer;
+// };
+
+// class Mesh {
+// public:
+//     // Mesh(std::shared_ptr<Geometry> geometry, std::shared_ptr<Material> material);
+//     Mesh(std::shared_ptr<Geometry> geometry);
+
+//     void Draw(const Shader& shader) const;
+//     void DrawRaw() const;
+
+//     const std::shared_ptr<Geometry>& GetGeometry() const { return m_Geometry; }
+//     // const std::shared_ptr<Material>& GetMaterial() const { return m_Material; }
+// private:
+//     std::shared_ptr<Geometry> m_Geometry;
+//     // std::shared_ptr<Material> m_Material;
+// };
+
+class Mesh
 {
 public:
-    Geometry(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
+    Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indicies);
 
-public:
     void Bind() const;
     void Unbind() const;
-    uint32_t GetIndexCount() const { return m_IndexBuffer->GetCount(); }
-    static std::shared_ptr<Geometry> Generate(MeshPrimitive primitive);
+
+    void Draw() const;
+    void DrawLines() const;
+
+    static std::shared_ptr<Mesh> Generate(MeshPrimitive primitive);
 
 private:
-    static std::shared_ptr<Geometry> GenerateCube();
-    static std::shared_ptr<Geometry> GeneratePlane();
+    static std::shared_ptr<Mesh> GenerateCube();
+    static std::shared_ptr<Mesh> GeneratePlane();
 
-    static void ComputeTangents(std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices);
-
+private:
     std::shared_ptr<VertexArray> m_VertexArray;
     std::shared_ptr<VertexBuffer> m_VertexBuffer;
     std::shared_ptr<IndexBuffer> m_IndexBuffer;
-};
-
-class Mesh {
-public:
-    Mesh(std::shared_ptr<Geometry> geometry, std::shared_ptr<Material> material);
-
-    void Draw(const Shader& shader) const;
-
-    const std::shared_ptr<Geometry>& GetGeometry() const { return m_Geometry; }
-    const std::shared_ptr<Material>& GetMaterial() const { return m_Material; }
-private:
-    std::shared_ptr<Geometry> m_Geometry;
-    std::shared_ptr<Material> m_Material;
 };

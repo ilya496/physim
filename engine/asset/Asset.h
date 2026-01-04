@@ -7,8 +7,9 @@ using AssetHandle = UUID;
 enum class AssetType : uint16_t
 {
     None = 0,
-    Scene,
     Texture,
+    Mesh,
+    Material
 };
 
 inline std::string_view AssetTypeToString(AssetType type)
@@ -16,8 +17,9 @@ inline std::string_view AssetTypeToString(AssetType type)
     switch (type)
     {
     case AssetType::None: return "AssetType::None";
-    case AssetType::Scene: return "AssetType::Scene";
+    case AssetType::Mesh: return "AssetType::Mesh";
     case AssetType::Texture: return "AssetType::Texture";
+    case AssetType::Material: return "AssetType::Material";
     }
 
     return "AssetType::<Invalid>";
@@ -26,8 +28,9 @@ inline std::string_view AssetTypeToString(AssetType type)
 inline AssetType AssetTypeFromString(std::string_view assetType)
 {
     if (assetType == "AssetType::None") return AssetType::None;
-    if (assetType == "AssetType::Scene") return AssetType::Scene;
+    if (assetType == "AssetType::Mesh") return AssetType::Mesh;
     if (assetType == "AssetType::Texture") return AssetType::Texture;
+    if (assetType == "AssetType::Material") return AssetType::Material;
 
     return AssetType::None;
 }

@@ -162,6 +162,8 @@ std::filesystem::path FileDialog::SelectFolder(const std::string& title)
 
 #elif defined(__linux__)
 // GTK / Zenity
+// maybe some day in the future idk :/
 #else
 // macOS - not supported
+// fuck Steve Jobs
 #endif

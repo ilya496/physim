@@ -6,7 +6,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "core/UUID.h"
-#include "entt.hpp"
+#include "asset/Asset.h"
+#include "render/Camera.h"
+#include "render/LightType.h"
 
 // Core
 struct IDComponent
@@ -28,7 +30,8 @@ struct TagComponent
 struct TransformComponent
 {
     glm::vec3 Translation{ 0.0f, 0.0f, 0.0f };
-    glm::quat Rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+    // glm::quat Rotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+    glm::quat Rotation = glm::identity<glm::quat>();
     glm::vec3 Scale{ 1.0f, 1.0f, 1.0f };
 
     TransformComponent() = default;
@@ -39,101 +42,69 @@ struct TransformComponent
 
     glm::mat4 GetTransform() const
     {
-        glm::mat4 transform = glm::translate(glm::mat4(1.0f), Translation);
-        transform *= glm::mat4_cast(Rotation);
-        transform = glm::scale(transform, Scale);
-        return transform;
+        return glm::translate(glm::mat4(1.0f), Translation)
+            * glm::mat4_cast(Rotation)
+            * glm::scale(glm::mat4(1.0f), Scale);
     }
 };
 
 // Render
 struct MeshRenderComponent
 {
-
+    AssetHandle Mesh;
+    AssetHandle Material;
 };
 
-struct MaterialComponent
-{
-
-};
-
-// struct SpriteRenderComponent
+// struct CameraComponent
 // {
-
+//     Camera Camera;
+//     bool Primary = true;
 // };
 
-struct CameraComponent
+struct LightComponent
 {
+    LightType Type = LightType::Point;
+    glm::vec3 Color{ 1.0f };
+    float Intensity = 1.0f;
 
+    float Range = 10.0f; // point / spot light
+    glm::vec3 Direction{ 0.0f, -1.0f, 0.0f }; // directional light
 };
-
-struct DirectionalLightComponent
-{
-
-};
-
-struct PointLightComponent
-{
-
-};
-
-// struct SpotLightComponent 
-// {
-
-// };
-
-// Physics
 
 struct RigidBodyComponent
 {
-    enum class BodyType { Static, Dynamic, Kinematic };
+    float Mass = 1.0f;
+    float Restitution = 0.2f;
+    float Friction = 0.6f;
+    bool IsStatic = false;
 
-    BodyType Type = BodyType::Dynamic;
+    glm::vec3 Velocity{ 0 };
+    glm::vec3 AngularVelocity{ 0 };
+};
 
-    // Kinematic: transform is driven externally
-    bool FreezeRotation = false;
-    bool FreezePosition = false;
 
-    // Linear motion
-    glm::vec3 Velocity = glm::vec3(0.0f);
-    glm::vec3 Acceleration = glm::vec3(0.0f);
-    glm::vec3 Forces = glm::vec3(0.0f);
+enum class ColliderType
+{
+    Sphere,
+    Box,
+    Convex
+};
 
-    // Angular motion
-    glm::vec3 AngularVelocity = glm::vec3(0.0f);
-    glm::vec3 Torque = glm::vec3(0.0f);
-
-    // Mass & inertia
-    float Mass = 1.0f;              // must not be zero for dynamic bodies
-    float InverseMass = 1.0f;       // computed internally
-    glm::mat3 InertiaTensor = glm::mat3(1.0f);
-    glm::mat3 InverseInertiaTensor = glm::mat3(1.0f);
-
-    // Physical material
-    float LinearDamping = 0.01f;
-    float AngularDamping = 0.01f;
-
-    bool UseGravity = true;
-
-    // Runtime pointer (if needed in future)
-    void* RuntimeBody = nullptr;
+struct SphereColliderComponent
+{
+    float Radius = 0.5f;
 };
 
 struct BoxColliderComponent
 {
-    glm::vec3 HalfSize = glm::vec3(0.5f);
-    glm::vec3 Offset = glm::vec3(0.0f);
-
-    bool IsTrigger = false;
+    glm::vec3 HalfExtents{ 0.5f };
 };
 
-// struct SphereColliderComponent
-// {
-//     float Radius = 0.5f;
-//     glm::vec3 Offset = glm::vec3(0.0f);
+struct ConvexColliderComponent
+{
+    std::vector<glm::vec3> Vertices; // LOCAL space
+};
 
-//     bool IsTrigger = false;
-// };
 
 // struct CapsuleColliderComponent
 // {

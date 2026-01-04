@@ -17,6 +17,8 @@ enum class EventType {
     WINDOW_CLOSE_EVENT,
     NEW_FRAME_RENDERED_EVENT,
     UPDATE_RENDER_SETTINGS_EVENT,
+
+    VIEWPORT_EVENT,
 };
 
 class Event {
@@ -117,8 +119,8 @@ public:
 class MouseMoveEvent : public Event
 {
 public:
-    MouseMoveEvent(float x, float y)
-        : X(x), Y(y) {
+    MouseMoveEvent(float x, float y, float dx, float dy)
+        : X(x), Y(y), DeltaX(dx), DeltaY(dy) {
     }
 
     static EventType GetStaticType() { return EventType::MOUSE_MOVE_EVENT; }
@@ -126,6 +128,7 @@ public:
     virtual const char* GetName() const override { return "MOUSE_MOVE_EVENT"; }
 
     float X, Y;
+    float DeltaX, DeltaY;
 };
 
 class MouseScrollEvent : public Event
@@ -155,4 +158,33 @@ public:
 
     uint32_t ColorAttachment;
     uint32_t Width, Height;
+};
+
+class ViewportEvent : public Event
+{
+public:
+    ViewportEvent(
+        float mouseX,
+        float mouseY,
+        float viewportX,
+        float viewportY,
+        float viewportWidth,
+        float viewportHeight,
+        bool hovered
+    ) : MouseX(mouseX), MouseY(mouseY), ViewportX(viewportX), ViewportY(viewportY),
+        ViewportWidth(viewportWidth), ViewportHeight(viewportHeight), Hovered(hovered)
+    {
+    }
+
+    static EventType GetStaticType() { return EventType::VIEWPORT_EVENT; }
+    virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "VIEWPORT_EVENT"; }
+
+    float MouseX;
+    float MouseY;
+    float ViewportX;
+    float ViewportY;
+    float ViewportWidth;
+    float ViewportHeight;
+    bool Hovered;
 };

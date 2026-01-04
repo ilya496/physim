@@ -4,19 +4,33 @@
 
 #include "Asset.h"
 #include "AssetMetadata.h"
+#include "render/Model.h"
 
-struct Texture : Asset
-{
-    virtual AssetType GetType() const override { return AssetType::Texture; }
-}; // TODO: implement
-struct Scene : Asset {}; // TODO: implement
+#include <assimp/scene.h>
 
 class AssetImporter
 {
 public:
-    static std::shared_ptr<Asset> ImportAsset(AssetHandle hanadle, const AssetMetadata& metadata);
+    static std::shared_ptr<Asset> ImportAsset(AssetHandle handle, const AssetMetadata& metadata);
 
 private:
-    static std::shared_ptr<Texture> ImportTexture(AssetHandle handle, const AssetMetadata& metadata);
-    static std::shared_ptr<Scene> ImportScene(AssetHandle handle, const AssetMetadata& metadata);
+    static std::shared_ptr<TextureAsset> ImportTexture(AssetHandle handle, const AssetMetadata& metadata);
+    static std::shared_ptr<MeshAsset> ImportMesh(AssetHandle handle, const AssetMetadata& metadata);
+    static std::shared_ptr<MaterialAsset> ImportMaterial(AssetHandle handle, const AssetMetadata& metadata);
+
+    static void ProcessAssimpMesh(
+        aiMesh* mesh,
+        const aiScene* scene,
+        std::vector<Vertex>& outVertices,
+        std::vector<uint32_t>& outIndices
+    );
+
+    static void ProcessAssimpNode(
+        aiNode* node,
+        const aiScene* scene,
+        std::vector<Vertex>& vertices,
+        std::vector<uint32_t>& indices
+    );
+    // static std::shared_ptr<ShaderAsset> ImportShader(AssetHandle handle, const AssetMetadata& metadata);
+    // static std::shared_ptr<MaterialAsset> CreateDefaultMaterial();
 };

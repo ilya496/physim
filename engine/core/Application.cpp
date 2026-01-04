@@ -4,9 +4,13 @@
 #include "Timer.h"
 #include "RenderLayer.h"
 
+Application* Application::s_Instance = nullptr;
+
 Application::Application(WindowProps windowProps)
 {
     m_Window = std::make_unique<Window>(windowProps);
+
+    s_Instance = this;
 
     m_WindowCloseSub =
         EventBus::Subscribe<WindowCloseEvent>(
@@ -16,8 +20,8 @@ Application::Application(WindowProps windowProps)
             }
         );
 
-    m_LayerStack.PushLayer(std::make_unique<RenderLayer>(800, 600));
-    std::cout << "render layer pushed";
+    m_LayerStack.PushLayer(std::make_unique<RenderLayer>(windowProps.width, windowProps.height));
+    std::cout << "render layer pushe\n";
 
     m_LastFrameTime = glfwGetTime();
 }
@@ -42,8 +46,8 @@ void Application::Run()
 
         m_LayerStack.OnRender();
 
-        std::cout << "FPS: " << Timer::FPS()
-            << "   Frame: " << Timer::AverageFrameTime() << "\n";
+        // std::cout << "FPS: " << Timer::FPS()
+        //     << "   Frame: " << Timer::AverageFrameTime() << "\n";
 
         m_Window->SwapBuffers();
     }

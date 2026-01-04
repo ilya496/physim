@@ -3,15 +3,17 @@
 #include <string>
 #include <filesystem>
 
-#include "asset/AssetManager.h"
+#include "scene/Scene.h"
+
+class AssetManager;
 
 struct ProjectConfig
 {
     std::string Name = "Untitled";
-    AssetHandle StartScene;
+    AssetHandle StartScene = 0;
 
-    std::filesystem::path AssetDirectory;
-    std::filesystem::path AssetRegistryPath;
+    std::filesystem::path AssetDirectory = "assets";
+    std::filesystem::path AssetRegistryPath = "asset_registry.json";
 };
 
 class Project
@@ -48,6 +50,8 @@ public:
 
     static std::shared_ptr<Project> GetActive() { return s_ActiveProject; }
     std::shared_ptr<AssetManager> GetAssetManager() { return m_AssetManager; }
+    std::shared_ptr<Scene> GetActiveScene() { return m_ActiveScene; }
+    void SetActiveScene(std::shared_ptr<Scene> scene) { m_ActiveScene = scene; }
 
     static std::shared_ptr<Project> New();
     static std::shared_ptr<Project> Load(const std::filesystem::path& path);
@@ -58,6 +62,7 @@ private:
     ProjectConfig m_Config;
     std::filesystem::path m_ProjectDirectory;
     std::shared_ptr<AssetManager> m_AssetManager;
+    std::shared_ptr<Scene> m_ActiveScene;
 
     inline static std::shared_ptr<Project> s_ActiveProject;
 };

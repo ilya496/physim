@@ -43,7 +43,6 @@ target_include_directories(imgui PUBLIC
 include_directories(
   "${CMAKE_SOURCE_DIR}/libs/glm"
   "${CMAKE_SOURCE_DIR}/libs/stb"
-  "${CMAKE_SOURCE_DIR}/libs/entt"
 )
 
 # ----------------------------
@@ -58,9 +57,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(assimp)
 
 include(FetchContent)
-
 FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
 FetchContent_MakeAvailable(json)
+
+include(FetchContent)
+FetchContent_Declare(
+    entt
+    GIT_REPOSITORY https://github.com/skypjack/entt.git
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(entt)
 
 # ----------------------------
 # Add engine + editor

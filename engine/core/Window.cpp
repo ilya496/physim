@@ -231,7 +231,11 @@ void Window::InitCallbacks()
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
             // if (!window->m_EventCallback) return;
 
-            MouseMoveEvent ev((float)x, (float)y);
+            glm::vec2 currentPos = { (float)x, (float)y };
+            glm::vec2 delta = currentPos - window->m_LastMousePos;
+            window->m_LastMousePos = currentPos;
+
+            MouseMoveEvent ev(currentPos.x, currentPos.y, delta.x, delta.y);
             // window->m_EventCallback(ev);
             EventBus::Publish(ev);
         });

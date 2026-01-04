@@ -4,3 +4,4 @@ build/
 *.vcxproj*
 CMakeCache.txt
 cmake_install.cmake
+*.obj
