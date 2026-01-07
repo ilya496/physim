@@ -291,19 +291,22 @@ struct SoftBody
     std::vector<SoftBodyLink> Links;
 };
 
-struct ContactContraint
+struct ContactConstraint
 {
-    RigidBody* BodyA;
-    RigidBody* BodyB;
+    RigidBody* A;
+    RigidBody* B;
 
     glm::vec3 Normal;
     glm::vec3 ContactPoint;
 
-    float Penetration;
+    glm::vec3 rA;
+    glm::vec3 rB;
+
     float NormalMass;
     float Bias;
 
-    float AccumulatedImpulse = 0.0f;
+    float AccumulatedNormalImpulse = 0.0f;
+    float AccumulatedTangentImpulse = 0.0f;
 };
 
 class ContactSolver

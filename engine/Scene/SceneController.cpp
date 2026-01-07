@@ -9,7 +9,7 @@ void SceneController::Play()
 
     m_RuntimeScene = m_EditorScene->Copy();
 
-    m_PhysicsWorld = std::make_unique<PhysicsWorld>(m_RuntimeScene.get());
+    // m_PhysicsWorld = std::make_unique<PhysicsWorld>(m_RuntimeScene.get());
 
     Project::GetActive()->SetActiveScene(m_RuntimeScene);
 
@@ -29,8 +29,8 @@ void SceneController::Stop()
     if (m_State == SimulationState::Stopped)
         return;
 
-    m_PhysicsWorld->Shutdown();
-    m_PhysicsWorld.reset();
+    // m_PhysicsWorld->Shutdown();
+    // m_PhysicsWorld.reset();
     m_RuntimeScene.reset();
 
     Project::GetActive()->SetActiveScene(m_EditorScene);
@@ -54,7 +54,7 @@ void SceneController::Update(float dt)
     accumulator += dt;
     while (accumulator >= fixedStep)
     {
-        m_PhysicsWorld->Step(fixedStep);
+        // m_PhysicsWorld->Step(fixedStep);
         accumulator -= fixedStep;
     }
 }
