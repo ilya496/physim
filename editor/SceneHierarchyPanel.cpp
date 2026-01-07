@@ -39,11 +39,25 @@ void SceneHierarchyPanel::Draw(std::shared_ptr<Scene> scene)
 
     if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonRight))
     {
-        if (ImGui::MenuItem("Create Empty Entity"))
+        if (ImGui::MenuItem("Add Empty Entity"))
             scene->CreateEntity("Empty Entity");
 
-        if (ImGui::MenuItem("Create Light"))
-            scene->CreateLightEntity("Light");
+        if (ImGui::BeginMenu("Add Light"))
+        {
+            if (ImGui::MenuItem("Point Light"))
+            {
+                scene->CreateLightEntity("Light");
+            }
+
+            if (ImGui::MenuItem("Spot Light", nullptr, false, false))
+            {
+            }
+
+            if (ImGui::MenuItem("Directional Light", nullptr, false, false))
+            {
+            }
+            ImGui::EndMenu();
+        }
 
         ImGui::EndPopup();
     }

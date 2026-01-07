@@ -35,7 +35,7 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
     ImGui::Separator();
 
     // tabs
-    ImGui::BeginChild("AssetTabs", ImVec2(110, 0), true);
+    ImGui::BeginChild("AssetTabs", ImVec2(170, 0), true);
 
     if (ImGui::Selectable("Meshes", m_CurrentTab == AssetTab::Meshes))
         m_CurrentTab = AssetTab::Meshes;

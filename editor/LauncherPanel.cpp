@@ -19,7 +19,7 @@ std::optional<std::filesystem::path> LauncherPanel::Draw(const glm::ivec2& fb)
         ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_NoMove);
 
-    const ImVec2 windowSize(700, 400);
+    const ImVec2 windowSize(850, 500);
 
     ImGui::SetWindowSize(windowSize, ImGuiCond_Always);
     ImGui::SetWindowPos(
@@ -63,7 +63,7 @@ void LauncherPanel::DrawHeader()
 {
     ImGui::Text("Recent Projects");
 
-    const float buttonWidth = 120.0f;
+    const float buttonWidth = 185.0f;
     const float spacing = ImGui::GetStyle().ItemSpacing.x;
     const float totalWidth = buttonWidth * 2 + spacing;
 
@@ -84,7 +84,7 @@ void LauncherPanel::DrawHeader()
 
 void LauncherPanel::DrawRecentProjects()
 {
-    ImGui::BeginChild("RecentProjects", ImVec2(0, 250), true);
+    ImGui::BeginChild("RecentProjects", ImVec2(0, 300), true);
 
     for (int i = 0; i < (int)m_Settings.RecentProjects.size(); ++i)
     {

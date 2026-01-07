@@ -66,19 +66,19 @@ void EditorLayer::OnUpdate(float dt)
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    if (m_ViewportHovered)
+    if (Input::IsKeyPressed(KeyCode::LeftControl))
     {
-        if (Input::IsKeyPressed(KeyCode::G))
-            m_GizmoMode = GizmoMode::Translate;
-
-        if (Input::IsKeyPressed(KeyCode::R))
-            m_GizmoMode = GizmoMode::Rotate;
-
         if (Input::IsKeyPressed(KeyCode::S))
-            m_GizmoMode = GizmoMode::Scale;
+        {
+            Project::SaveActive(Project::GetActiveProjectName());
+        }
 
-        if (Input::IsKeyPressed(KeyCode::Escape) || Input::MouseButtonPressed(MouseCode::ButtonLeft))
-            m_GizmoMode = GizmoMode::None;
+        if (Input::IsKeyPressed(KeyCode::O))
+        {
+            auto path = FileDialog::OpenFile("Physim Project", "physim");
+            if (!path.empty())
+                OpenProject(path);
+        }
     }
 
     BeginDockspace();
@@ -120,10 +120,15 @@ void EditorLayer::SetupImGuiFonts(const char* path)
     float xs, ys;
     glfwGetWindowContentScale(m_Window->GetNativeWindow(), &xs, &ys);
 
-    float fontSize = 16.0f * xs;
+    float dpiScale = xs;
+    ImGuiStyle& style = ImGui::GetStyle();
+    style = ImGuiStyle();
+    ImGui::StyleColorsDark();
+
+    style.ScaleAllSizes(dpiScale);
 
     io.Fonts->Clear();
-    io.FontDefault = io.Fonts->AddFontFromFileTTF(path, fontSize);
+    io.FontDefault = io.Fonts->AddFontFromFileTTF(path, 16.0f * dpiScale);
     io.Fonts->Build();
 }
 
@@ -162,12 +167,12 @@ void EditorLayer::BeginDockspace()
                 ImGui::Separator();
             }
 
-            if (ImGui::MenuItem("Save Project"))
+            if (ImGui::MenuItem("Save Project", "Ctrl+S"))
             {
-                // Project::SaveActive(...);
+                Project::SaveActive(Project::GetActiveProjectName());
             }
 
-            if (ImGui::MenuItem("Open Project..."))
+            if (ImGui::MenuItem("Open Project...", "Ctrl+O"))
             {
                 auto path = FileDialog::OpenFile("Physim Project", "physim");
                 if (!path.empty())
@@ -175,7 +180,7 @@ void EditorLayer::BeginDockspace()
             }
 
             bool hasProject = Project::GetActive() != nullptr;
-            if (ImGui::MenuItem("Close Project", nullptr, false, hasProject))
+            if (ImGui::MenuItem("Close Project", "Ctrl+W", false, hasProject))
             {
                 Project::Close();
                 m_State = EditorState::Launcher;
@@ -191,7 +196,6 @@ void EditorLayer::BeginDockspace()
 
     ImGui::End();
 }
-
 
 void EditorLayer::OpenProject(const std::filesystem::path& path)
 {
@@ -246,9 +250,7 @@ void EditorLayer::DrawViewport()
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 
-    ImGui::Begin("Viewport", nullptr,
-        ImGuiWindowFlags_NoBringToFrontOnFocus |
-        ImGuiWindowFlags_NoFocusOnAppearing);
+    ImGui::Begin("Viewport", nullptr);
 
     ImVec2 viewportMin = ImGui::GetCursorScreenPos();
     ImVec2 viewportSize = ImGui::GetContentRegionAvail();
@@ -269,13 +271,19 @@ void EditorLayer::DrawViewport()
         );
     }
 
-
     ImVec2 mousePos = ImGui::GetMousePos();
     bool hovered =
         mousePos.x >= viewportMin.x &&
         mousePos.x <= viewportMax.x &&
         mousePos.y >= viewportMin.y &&
         mousePos.y <= viewportMax.y;
+
+    if (viewportSize.x <= 0.0f || viewportSize.y <= 0.0f)
+    {
+        ImGui::End();
+        ImGui::PopStyleVar(2);
+        return;
+    }
 
     ImGui::InvisibleButton("##ViewportDropTarget", viewportSize,
         ImGuiButtonFlags_MouseButtonLeft |

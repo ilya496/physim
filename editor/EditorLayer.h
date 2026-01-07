@@ -9,7 +9,6 @@
 #include "AssetPanel.h"
 #include "SceneHierarchyPanel.h"
 #include "scene/SceneController.h"
-#include "GizmoMode.h"
 
 enum class EditorState
 {
@@ -41,7 +40,6 @@ private:
 private:
     Window* m_Window = nullptr;
     EditorState m_State = EditorState::Launcher;
-    GizmoMode m_GizmoMode = GizmoMode::None;
     bool m_ViewportHovered = false;
 
     EditorSettings m_Settings;
