@@ -46,6 +46,11 @@ public:
         return s_ActiveProject->GetAssetFileSystemPath(path);
     }
 
+    static std::filesystem::path GetActiveProjectName()
+    {
+        return s_ActiveProject->GetProjectDirectory() / s_ActiveProject->m_Config.Name;
+    }
+
     ProjectConfig& GetConfig() { return m_Config; }
 
     static std::shared_ptr<Project> GetActive() { return s_ActiveProject; }

@@ -47,11 +47,18 @@ std::shared_ptr<Project> Project::Load(const std::filesystem::path& path)
 
 bool Project::SaveActive(const std::filesystem::path& path)
 {
+    s_ActiveProject->m_Config.Name = path.filename().string();
     ProjectSerializer serializer(s_ActiveProject);
     if (serializer.Serialize(path))
     {
         s_ActiveProject->m_ProjectDirectory = path.parent_path();
-        return true;
+        SceneSerializer sceneSerializer(s_ActiveProject->m_ActiveScene);
+
+        if (sceneSerializer.Serialize(path.parent_path() / "assets" / "main.scene"))
+        {
+            return true;
+        }
+
     }
 
     return false;

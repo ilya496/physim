@@ -96,21 +96,19 @@ bool SceneSerializer::Serialize(const std::filesystem::path& filepath)
     auto& registry = m_Scene->GetRegistry();
     auto view = registry.view<IDComponent>();
 
-    for (auto entity : view)
+    for (auto entityID : view)
     {
-        Entity entity{ entity, m_Scene.get() };
+        Entity entity{ entityID, m_Scene.get() };
         json e;
 
         e["Entity"] = entity.GetUUID();
 
-        // tag
         if (entity.HasComponent<TagComponent>())
         {
             auto& tc = entity.GetComponent<TagComponent>();
             e["TagComponent"]["Tag"] = tc.Tag;
         }
 
-        // transform
         if (entity.HasComponent<TransformComponent>())
         {
             auto& tc = entity.GetComponent<TransformComponent>();
@@ -121,17 +119,15 @@ bool SceneSerializer::Serialize(const std::filesystem::path& filepath)
             };
         }
 
-        // mesh
         if (entity.HasComponent<MeshRenderComponent>())
         {
             auto& mc = entity.GetComponent<MeshRenderComponent>();
-            e["MeshComponent"] = {
+            e["MeshRenderComponent"] = {
                 { "Mesh", mc.Mesh },
                 { "Material", mc.Material }
             };
         }
 
-        // rigid body
         if (entity.HasComponent<RigidBodyComponent>())
         {
             auto& rb = entity.GetComponent<RigidBodyComponent>();
@@ -145,7 +141,6 @@ bool SceneSerializer::Serialize(const std::filesystem::path& filepath)
             };
         }
 
-        // colliders
         if (entity.HasComponent<BoxColliderComponent>())
         {
             auto& bc = entity.GetComponent<BoxColliderComponent>();
@@ -158,7 +153,6 @@ bool SceneSerializer::Serialize(const std::filesystem::path& filepath)
             e["SphereColliderComponent"]["Radius"] = sc.Radius;
         }
 
-        // light
         if (entity.HasComponent<LightComponent>())
         {
             auto& lc = entity.GetComponent<LightComponent>();
