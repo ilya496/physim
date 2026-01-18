@@ -51,6 +51,10 @@ void EditorLayer::OnAttach()
             m_ViewportHeight = e.Height;
         }
     );
+
+    m_PlayButtonIcon = Texture::Create("../editor/icons/play-button.png");
+    m_PauseButtonIcon = Texture::Create("../editor/icons/pause-button.png");;
+    m_StopButtonIcon = Texture::Create("../editor/icons/stop-button.png");;
 }
 
 void EditorLayer::OnDetach()
@@ -103,7 +107,6 @@ void EditorLayer::OnRender()
     else
     {
         DrawViewport();
-        DrawToolbar();
         m_AssetPanel->Draw(Project::GetActive()->GetActiveScene());
         m_InspectorPanel->Draw(Project::GetActive()->GetActiveScene());
         m_SceneHierarchyPanel->Draw(Project::GetActive()->GetActiveScene());
@@ -226,25 +229,6 @@ void EditorLayer::CreateNewProject()
     m_State = EditorState::Editor;
 }
 
-void EditorLayer::DrawToolbar()
-{
-    ImGui::Begin("Toolbar", nullptr);
-
-    if (ImGui::Button("Play"))
-        m_SceneController.Play();
-
-    ImGui::SameLine();
-    if (ImGui::Button("Pause"))
-        m_SceneController.Pause();
-
-    ImGui::SameLine();
-    if (ImGui::Button("Stop"))
-        m_SceneController.Stop();
-
-    ImGui::End();
-}
-
-
 void EditorLayer::DrawViewport()
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -284,6 +268,78 @@ void EditorLayer::DrawViewport()
         ImGui::PopStyleVar(2);
         return;
     }
+
+    // ===============================
+// Viewport top-center toolbar
+// ===============================
+
+    const float buttonSize = 25.0f;
+    const float padding = 6.0f;
+    const float toolbarHeight = buttonSize + padding * 2.0f;
+    const float spacing = 6.0f;
+
+    float totalWidth =
+        buttonSize * 3.0f +
+        spacing * 2.0f +
+        padding * 2.0f;
+
+    ImVec2 toolbarMin = {
+        viewportMin.x + (viewportSize.x - totalWidth) * 0.5f,
+        viewportMin.y + 8.0f
+    };
+
+    ImVec2 toolbarMax = {
+        toolbarMin.x + totalWidth,
+        toolbarMin.y + toolbarHeight
+    };
+
+    // Background
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(
+        toolbarMin,
+        toolbarMax,
+        IM_COL32(25, 25, 25, 220),
+        6.0f
+    );
+
+    // Border
+    dl->AddRect(
+        toolbarMin,
+        toolbarMax,
+        IM_COL32(60, 60, 60, 255),
+        6.0f
+    );
+
+    // Buttons
+    ImGui::SetCursorScreenPos({
+        toolbarMin.x + padding,
+        toolbarMin.y + padding
+        });
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+
+    if (ImGui::ImageButton("##PlayButton", (ImTextureID)m_PlayButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
+    {
+        m_SceneController.Play();
+    }
+
+    ImGui::SameLine(0.0f, spacing);
+
+    if (ImGui::ImageButton("##PauseButton", (ImTextureID)m_PauseButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
+    {
+        m_SceneController.Pause();
+    }
+
+    ImGui::SameLine(0.0f, spacing);
+
+    if (ImGui::ImageButton("##StopButton", (ImTextureID)m_StopButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
+    {
+        m_SceneController.Stop();
+    }
+
+    ImGui::PopStyleVar(2);
+
 
     ImGui::InvisibleButton("##ViewportDropTarget", viewportSize,
         ImGuiButtonFlags_MouseButtonLeft |
@@ -325,6 +381,53 @@ void EditorLayer::DrawViewport()
             0,
             2.0f
         );
+    }
+
+    static bool showAddMeshPopup = false;
+
+    if (hovered && Input::IsKeyPressed(KeyCode::A) && Input::IsKeyPressed(KeyCode::LeftShift))
+    {
+        showAddMeshPopup = true;
+    }
+
+    if (showAddMeshPopup)
+    {
+        ImGui::OpenPopup("Add Mesh");
+    }
+
+    if (ImGui::BeginPopupModal("Add Mesh", &showAddMeshPopup))
+    {
+        if (ImGui::MenuItem("Cube"))
+        {
+            showAddMeshPopup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::MenuItem("UV Sphere"))
+        {
+            showAddMeshPopup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::MenuItem("Ico Sphere"))
+        {
+            showAddMeshPopup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::MenuItem("Plane"))
+        {
+            showAddMeshPopup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::MenuItem("Cylinder"))
+        {
+            showAddMeshPopup = false;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 
     EventBus::Publish(ViewportEvent{

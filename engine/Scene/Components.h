@@ -100,11 +100,6 @@ struct BoxColliderComponent
     glm::vec3 HalfExtents{ 0.5f };
 };
 
-struct ConvexColliderComponent
-{
-    std::vector<glm::vec3> Vertices; // LOCAL space
-};
-
 
 // struct CapsuleColliderComponent
 // {

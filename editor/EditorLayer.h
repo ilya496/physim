@@ -32,7 +32,6 @@ private:
     void SetupImGuiFonts(const char* fontPath);
     void BeginDockspace();
     void DrawViewport();
-    void DrawToolbar();
 
     void OpenProject(const std::filesystem::path& path);
     void CreateNewProject();
@@ -54,4 +53,8 @@ private:
     uint32_t m_ViewportWidth = 0;
     uint32_t m_ViewportHeight = 0;
     EventBus::Subscription m_NewFrameSub;
+
+    std::shared_ptr<Texture> m_PlayButtonIcon;
+    std::shared_ptr<Texture> m_PauseButtonIcon;
+    std::shared_ptr<Texture> m_StopButtonIcon;
 };
