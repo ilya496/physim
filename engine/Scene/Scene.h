@@ -27,6 +27,24 @@ public:
     const entt::registry& GetRegistry() const noexcept { return m_Registry; }
 
     template<typename T>
+    bool HasComponent(entt::entity entity) const
+    {
+        return m_Registry.all_of<T>(entity);
+    }
+
+    template<typename T>
+    T& GetComponent(entt::entity entity)
+    {
+        return m_Registry.get<T>(entity);
+    }
+
+    template<typename T>
+    const T& GetComponent(entt::entity entity) const
+    {
+        return m_Registry.get<T>(entity);
+    }
+
+    template<typename T>
     void OnComponentAdded(Entity entity, T& component)
     {
         // default - no-op

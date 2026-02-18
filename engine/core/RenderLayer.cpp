@@ -7,6 +7,7 @@
 #include "project/Project.h"
 #include "scene/Entity.h"
 #include "render/RenderTarget.h"
+#include "physics/AABB.h"
 #include "EditorContext.h"
 #include "Input.h"
 

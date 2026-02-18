@@ -12,6 +12,7 @@
 #include "asset/Asset.h"
 #include "project/Project.h"
 #include "asset/AssetManager.h"
+#include "physics/AABB.h"
 
 class Texture;
 class Mesh;
@@ -301,6 +302,7 @@ public:
     void Draw() const;
     void DrawLines() const;
 
+    const AABB& GetLocalAABB() const { return m_LocalAABB; }
     static std::shared_ptr<Mesh> Generate(MeshPrimitive primitive);
 
 private:
@@ -311,4 +313,5 @@ private:
     std::shared_ptr<VertexArray> m_VertexArray;
     std::shared_ptr<VertexBuffer> m_VertexBuffer;
     std::shared_ptr<IndexBuffer> m_IndexBuffer;
+    AABB m_LocalAABB;
 };

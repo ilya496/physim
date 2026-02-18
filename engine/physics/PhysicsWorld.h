@@ -1,133 +1,73 @@
 #pragma once
 
 #include <vector>
-#include "scene/Scene.h"
+#include <algorithm>
+#include <map>
+#include <iostream>
+
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/norm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+#include "AABB.h"
 
 enum class BodyType
 {
-    Static, Kinematic, Dynamic
-};
-
-struct AABB
-{
-    glm::vec3 Min;
-    glm::vec3 Max;
-
-    bool Overlaps(const AABB& other) const
-    {
-        return (Min.x <= other.Max.x && Max.x >= other.Min.x) &&
-            (Min.y <= other.Max.y && Max.y >= other.Min.y) &&
-            (Min.z <= other.Max.z && Max.z >= other.Min.z);
-    }
-};
-
-struct RigidBody
-{
-    BodyType Type;
-
-    glm::vec3 Position;
-    glm::quat Rotation;
-
-    glm::vec3 LinearVelocity;
-    glm::vec3 AngularVelocity;
-
-    float InverseMass;
-    glm::mat3 InverseInertiaLocal;
-
-    glm::vec3 Force;
-    glm::vec3 Torque;
-
-    float Restitution;
-    float Friction;
+    Static, Dynamic
 };
 
 enum class ShapeType
 {
     Sphere,
     Box,
-    Capsule,
-    ConvexHull,
     TriangleMesh
 };
 
 struct Shape
 {
     ShapeType Type;
-    AABB LocalAABB;
-
     virtual ~Shape() = default;
+    virtual AABB CalculateLocalAABB() const = 0;
+    virtual glm::mat3 CalculateInertiaTensor(float mass) const = 0;
 };
 
 struct SphereShape : public Shape
 {
-    float Radius = 0.5f;
+    float Radius;
+    SphereShape(float r) : Radius(r) { Type = ShapeType::Sphere; }
 
-    explicit SphereShape(float radius)
-        : Radius(radius)
-    {
-        Type = ShapeType::Sphere;
-        LocalAABB.Min = glm::vec3(-Radius);
-        LocalAABB.Max = glm::vec3(Radius);
+    AABB CalculateLocalAABB() const override {
+        return { glm::vec3(-Radius), glm::vec3(Radius) };
+    }
+
+    glm::mat3 CalculateInertiaTensor(float mass) const override {
+        float I = (2.0f / 5.0f) * mass * Radius * Radius;
+        return glm::mat3(I);
     }
 };
 
 struct BoxShape : public Shape
 {
-    glm::vec3 HalfExtents{ 0.5f };
+    glm::vec3 HalfExtents;
+    BoxShape(const glm::vec3& half) : HalfExtents(half) { Type = ShapeType::Box; }
 
-    explicit BoxShape(const glm::vec3& halfExtents)
-        : HalfExtents(halfExtents)
-    {
-        Type = ShapeType::Box;
-        LocalAABB.Min = -HalfExtents;
-        LocalAABB.Max = HalfExtents;
+    AABB CalculateLocalAABB() const override {
+        return { -HalfExtents, HalfExtents };
     }
-};
 
-struct CapsuleShape : public Shape
-{
-    float Radius = 0.5f;
-    float HalfHeight = 1.0f;
+    glm::mat3 CalculateInertiaTensor(float mass) const override {
+        float w2 = (2.0f * HalfExtents.x) * (2.0f * HalfExtents.x);
+        float h2 = (2.0f * HalfExtents.y) * (2.0f * HalfExtents.y);
+        float d2 = (2.0f * HalfExtents.z) * (2.0f * HalfExtents.z);
 
-    CapsuleShape(float radius, float height)
-        : Radius(radius), HalfHeight(height * 0.5f)
-    {
-        Type = ShapeType::Capsule;
-
-        LocalAABB.Min = glm::vec3(
-            -Radius,
-            -HalfHeight - Radius,
-            -Radius
+        return glm::mat3(
+            (1.0f / 12.0f) * mass * (h2 + d2), 0, 0,
+            0, (1.0f / 12.0f) * mass * (w2 + d2), 0,
+            0, 0, (1.0f / 12.0f) * mass * (w2 + h2)
         );
-
-        LocalAABB.Max = glm::vec3(
-            Radius,
-            HalfHeight + Radius,
-            Radius
-        );
-    }
-};
-
-struct ConvexHullShape : public Shape
-{
-    std::vector<glm::vec3> Vertices;
-
-    explicit ConvexHullShape(const std::vector<glm::vec3>& vertices)
-        : Vertices(vertices)
-    {
-        Type = ShapeType::ConvexHull;
-
-        glm::vec3 min = vertices[0];
-        glm::vec3 max = vertices[0];
-
-        for (const auto& v : vertices)
-        {
-            min = glm::min(min, v);
-            max = glm::max(max, v);
-        }
-
-        LocalAABB.Min = min;
-        LocalAABB.Max = max;
     }
 };
 
@@ -135,213 +75,494 @@ struct TriangleMeshShape : public Shape
 {
     std::vector<glm::vec3> Vertices;
     std::vector<uint32_t> Indices;
+    AABB CachedAABB;
 
-    TriangleMeshShape(
-        const std::vector<glm::vec3>& vertices,
-        const std::vector<uint32_t>& indices)
-        : Vertices(vertices), Indices(indices)
+    TriangleMeshShape(const std::vector<glm::vec3>& verts, const std::vector<uint32_t>& inds)
+        : Vertices(verts), Indices(inds)
     {
         Type = ShapeType::TriangleMesh;
 
-        glm::vec3 min = vertices[0];
-        glm::vec3 max = vertices[0];
-
-        for (const auto& v : vertices)
-        {
-            min = glm::min(min, v);
-            max = glm::max(max, v);
+        CachedAABB.Min = Vertices[0];
+        CachedAABB.Max = Vertices[0];
+        for (const auto& v : Vertices) {
+            CachedAABB.Min = glm::min(CachedAABB.Min, v);
+            CachedAABB.Max = glm::max(CachedAABB.Max, v);
         }
-
-        LocalAABB.Min = min;
-        LocalAABB.Max = max;
     }
+
+    AABB CalculateLocalAABB() const override { return CachedAABB; }
+
+    // Meshes are usually static, so infinite inertia (zero inverse)
+    glm::mat3 CalculateInertiaTensor(float mass) const override { return glm::mat3(0.0f); }
 };
 
-
-struct Collider
+struct RigidBody
 {
-    Shape* ColissionShape = nullptr;
+    int ID = -1;
+    BodyType Type = BodyType::Dynamic;
+
+    // State
+    glm::vec3 Position{ 0.0f };
+    glm::quat Orientation{ 1.0f, 0.0f, 0.0f, 0.0f };
+
+    glm::vec3 LinearVelocity{ 0.0f };
+    glm::vec3 AngularVelocity{ 0.0f };
+
+    // Properties
+    float Mass = 1.0f;
+    float InverseMass = 1.0f;
+
+    glm::mat3 InverseInertiaLocal{ 1.0f };
+    glm::mat3 InverseInertiaWorld{ 1.0f };
+
+    float Friction = 0.5f;
+    float Restitution = 0.2f; // Bounciness
+
+    // Forces
+    glm::vec3 ForceAccumulator{ 0.0f };
+    glm::vec3 TorqueAccumulator{ 0.0f };
+
+    Shape* CollisionShape = nullptr;
     AABB WorldAABB;
 
-    int32_t BroadPhaseProxy = -1;
-
-    uint32_t ColissionLayer = 0x00000001;
-    uint32_t ColissionMask = 0xFFFFFFFF;
-};
-
-struct BroadPhasePair
-{
-    int32_t ProxyA;
-    int32_t ProxyB;
-};
-
-class BroadPhase
-{
-public:
-    virtual ~BroadPhase() = default;
-
-    virtual int32_t CreateProxy(const AABB& aabb, void* userData) = 0;
-    virtual void DestroyProxy(int32_t proxyId) = 0;
-    virtual void MoveProxy(int32_t proxyId, const AABB& aabb) = 0;
-
-    virtual void ComputePairs(std::vector<BroadPhasePair>& outPairs) = 0;
-};
-
-struct TreeNode
-{
-    AABB Box;
-
-    int32_t Parent = -1;
-    int32_t Left = -1;
-    int32_t Right = -1;
-
-    int32_t Height = 0;
-
-    void* UserData = nullptr;
-
-    bool IsLeaf() const
+    void SetStatic()
     {
-        return Left == -1;
+        Type = BodyType::Static;
+        InverseMass = 0.0f;
+        InverseInertiaLocal = glm::mat3(0.0f);
+        InverseInertiaWorld = glm::mat3(0.0f);
+        LinearVelocity = glm::vec3(0.0f);
+        AngularVelocity = glm::vec3(0.0f);
+    }
+
+    void RecalculateMassProperties()
+    {
+        if (Type == BodyType::Static || !CollisionShape) {
+            SetStatic();
+            return;
+        }
+        InverseMass = 1.0f / Mass;
+        glm::mat3 I = CollisionShape->CalculateInertiaTensor(Mass);
+        InverseInertiaLocal = glm::inverse(I);
+    }
+
+    void UpdateWorldInertia()
+    {
+        if (Type == BodyType::Static) return;
+        glm::mat3 R = glm::toMat3(Orientation);
+        InverseInertiaWorld = R * InverseInertiaLocal * glm::transpose(R);
+    }
+
+    void UpdateAABB()
+    {
+        if (!CollisionShape) return;
+
+        AABB local = CollisionShape->CalculateLocalAABB();
+        glm::vec3 center = Position;
+        glm::vec3 extent = (local.Max - local.Min) * 0.5f;
+
+        // 1. Get the rotation matrix
+        glm::mat3 rotationMat = glm::toMat3(Orientation);
+
+        // 2. Get absolute values of the matrix (Column-by-column)
+        glm::mat3 R;
+        R[0] = glm::abs(rotationMat[0]);
+        R[1] = glm::abs(rotationMat[1]);
+        R[2] = glm::abs(rotationMat[2]);
+
+        // 3. Compute new extent
+        glm::vec3 newExtent = R * extent;
+
+        WorldAABB.Min = center - newExtent;
+        WorldAABB.Max = center + newExtent;
+    }
+
+    glm::vec3 LocalToWorld(const glm::vec3& local) const
+    {
+        return Position + (Orientation * local);
+    }
+
+    glm::vec3 WorldToLocal(const glm::vec3& world) const
+    {
+        return glm::inverse(Orientation) * (world - Position);
     }
 };
 
-class DynamicAABBTree : public BroadPhase
+struct Contact
 {
-public:
-    int32_t CreateProxy(const AABB& aabb, void* userData) override;
-    void DestroyProxy(int32_t proxyId) override;
-    void MoveProxy(int32_t proxyId, const AABB& aabb) override;
-    void ComputePairs(std::vector<BroadPhasePair>& outPairs) override;
-
-private:
-    int32_t AllocateNode();
-    void FreeNode(int32_t node);
-
-    void InsertLeaf(int32_t leaf);
-    void DeleteLeaf(int32_t leaf);
-
-    int32_t Balance(int32_t node);
-
-private:
-    std::vector<TreeNode> m_Nodes;
-    int32_t m_Root = -1;
-    int32_t m_FreeList = -1;
+    glm::vec3 WorldPointA;
+    glm::vec3 WorldPointB;
+    float Depth;
 };
 
-struct ContactPoint
-{
-    glm::vec3 Position{ 0.0f };
-    float Penetration = 0.0f;
-};
-
-struct ContactManifold
+struct Manifold
 {
     RigidBody* BodyA;
     RigidBody* BodyB;
-
-    glm::vec3 Normal{ 0.0f };
-
-    ContactPoint Contacts[4];
-    uint32_t ContactCount = 0;
+    glm::vec3 Normal; // From A to B
+    std::vector<Contact> Contacts;
 };
 
-class NarrowPhase
+inline bool IntersectSphereSphere(RigidBody* a, RigidBody* b, Manifold& m)
 {
-public:
-    bool GenerateContacts(
-        const Shape* shapeA,
-        const Shape* shapeB,
-        ContactManifold& manifold);
-};
+    SphereShape* sA = (SphereShape*)a->CollisionShape;
+    SphereShape* sB = (SphereShape*)b->CollisionShape;
 
-class Integrator
+    glm::vec3 delta = b->Position - a->Position;
+    float distSq = glm::length2(delta);
+    float radiusSum = sA->Radius + sB->Radius;
+
+    if (distSq > radiusSum * radiusSum) return false;
+
+    float dist = std::sqrt(distSq);
+
+    m.Normal = (dist > 0.0001f) ? delta / dist : glm::vec3(0, 1, 0);
+    m.BodyA = a;
+    m.BodyB = b;
+
+    Contact c;
+    c.Depth = radiusSum - dist;
+    c.WorldPointA = a->Position + m.Normal * sA->Radius;
+    c.WorldPointB = b->Position - m.Normal * sB->Radius;
+    m.Contacts.push_back(c);
+
+    return true;
+}
+
+inline bool IntersectSphereBox(RigidBody* sphereBody, RigidBody* boxBody, Manifold& m)
 {
-public:
-    void Integrate(RigidBody& body, float dt)
+    SphereShape* s = (SphereShape*)sphereBody->CollisionShape;
+    BoxShape* b = (BoxShape*)boxBody->CollisionShape;
+
+    // Transform sphere center to box local space
+    glm::vec3 localSpherePos = boxBody->WorldToLocal(sphereBody->Position);
+
+    // Clamp point to box extents
+    glm::vec3 closestPoint = glm::clamp(localSpherePos, -b->HalfExtents, b->HalfExtents);
+
+    float distSq = glm::length2(localSpherePos - closestPoint);
+    if (distSq > s->Radius * s->Radius) return false;
+
+    // We have a collision
+    m.BodyA = sphereBody;
+    m.BodyB = boxBody;
+
+    glm::vec3 localNormal = localSpherePos - closestPoint;
+    float dist = std::sqrt(distSq);
+
+    // Handle sphere inside box
+    if (dist < 0.0001f)
     {
-        if (body.Type != BodyType::Dynamic)
-            return;
-
-        body.LinearVelocity += body.Force * body.InverseMass * dt;
-        body.Position += body.LinearVelocity * dt;
-
-        body.Force = glm::vec3(0.0f);
-        body.Torque = glm::vec3(0.0f);
+        // Find closest axis to push out
+        // (Simplified for brevity: assume pushing up Y for now or use SAT logic)
+        localNormal = glm::vec3(0, 1, 0);
+        dist = 0.0f; // Deep penetration
     }
-};
+    else
+    {
+        localNormal /= dist;
+    }
 
-struct SoftBodyNode
+    m.Normal = boxBody->Orientation * localNormal; // World normal
+
+    Contact c;
+    c.Depth = s->Radius - dist;
+    // World position of contact on Box
+    c.WorldPointB = boxBody->LocalToWorld(closestPoint);
+    // World position of contact on Sphere
+    c.WorldPointA = sphereBody->Position - m.Normal * s->Radius;
+    m.Contacts.push_back(c);
+
+    return true;
+}
+
+// --- SAT Helpers for Box-Box ---
+inline float GetOverlap(float minA, float maxA, float minB, float maxB)
 {
-    glm::vec3 Position{ 0.0f };
-    glm::vec3 Velocity{ 0.0f };
-    float InverseMass = 0.0f;
-};
+    return std::min(maxA, maxB) - std::max(minA, minB);
+}
 
-struct SoftBodyLink
+inline float GetProjectedOverlap(const glm::vec3& axis, BoxShape* boxA, const glm::quat& rotA, const glm::vec3& posA,
+    BoxShape* boxB, const glm::quat& rotB, const glm::vec3& posB)
 {
-    uint32_t NodeA;
-    uint32_t NodeB;
-    float RestLength = 0.0f;
-    float Stiffness = 1.0f;
-};
+    // Project Box A
+    glm::vec3 axesA[3] = { rotA * glm::vec3(1,0,0), rotA * glm::vec3(0,1,0), rotA * glm::vec3(0,0,1) };
+    float rA = boxA->HalfExtents.x * std::abs(glm::dot(axesA[0], axis)) +
+        boxA->HalfExtents.y * std::abs(glm::dot(axesA[1], axis)) +
+        boxA->HalfExtents.z * std::abs(glm::dot(axesA[2], axis));
 
-struct SoftBody
+    // Project Box B
+    glm::vec3 axesB[3] = { rotB * glm::vec3(1,0,0), rotB * glm::vec3(0,1,0), rotB * glm::vec3(0,0,1) };
+    float rB = boxB->HalfExtents.x * std::abs(glm::dot(axesB[0], axis)) +
+        boxB->HalfExtents.y * std::abs(glm::dot(axesB[1], axis)) +
+        boxB->HalfExtents.z * std::abs(glm::dot(axesB[2], axis));
+
+    float projectionDist = std::abs(glm::dot(posB - posA, axis));
+    return (rA + rB) - projectionDist;
+}
+
+inline bool IntersectBoxBox(RigidBody* a, RigidBody* b, Manifold& m)
 {
-    std::vector<SoftBodyNode> Nodes;
-    std::vector<SoftBodyLink> Links;
-};
+    BoxShape* boxA = (BoxShape*)a->CollisionShape;
+    BoxShape* boxB = (BoxShape*)b->CollisionShape;
 
-struct ContactConstraint
+    glm::vec3 axesA[3] = { a->Orientation * glm::vec3(1,0,0), a->Orientation * glm::vec3(0,1,0), a->Orientation * glm::vec3(0,0,1) };
+    glm::vec3 axesB[3] = { b->Orientation * glm::vec3(1,0,0), b->Orientation * glm::vec3(0,1,0), b->Orientation * glm::vec3(0,0,1) };
+
+    glm::vec3 testAxes[15];
+    int axisCount = 0;
+
+    // Face axes
+    for (int i = 0; i < 3; i++) testAxes[axisCount++] = axesA[i];
+    for (int i = 0; i < 3; i++) testAxes[axisCount++] = axesB[i];
+
+    // Edge-Edge cross products
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            glm::vec3 cross = glm::cross(axesA[i], axesB[j]);
+            if (glm::length2(cross) > 0.001f)
+            {
+                testAxes[axisCount++] = glm::normalize(cross);
+            }
+        }
+    }
+
+    float minOverlap = FLT_MAX;
+    glm::vec3 bestAxis;
+
+    for (int i = 0; i < axisCount; i++)
+    {
+        float overlap = GetProjectedOverlap(testAxes[i], boxA, a->Orientation, a->Position, boxB, b->Orientation, b->Position);
+        if (overlap < 0) return false; // Separating axis found
+
+        if (overlap < minOverlap)
+        {
+            minOverlap = overlap;
+            bestAxis = testAxes[i];
+        }
+    }
+
+    // Ensure normal points from A to B
+    if (glm::dot(bestAxis, b->Position - a->Position) < 0)
+    {
+        bestAxis = -bestAxis;
+    }
+
+    m.BodyA = a;
+    m.BodyB = b;
+    m.Normal = bestAxis;
+
+    Contact c;
+    c.Depth = minOverlap;
+    // Approximating contact point (Simpler than full clipping for this snippet)
+    c.WorldPointA = a->Position + (bestAxis * boxA->HalfExtents.x); // Rough approximation
+    c.WorldPointB = b->Position - (bestAxis * boxB->HalfExtents.x);
+    m.Contacts.push_back(c);
+
+    return true;
+}
+
+inline void Dispatch(RigidBody* a, RigidBody* b, std::vector<Manifold>& manifolds)
 {
-    RigidBody* A;
-    RigidBody* B;
+    if (a->Type == BodyType::Static && b->Type == BodyType::Static) return;
 
-    glm::vec3 Normal;
-    glm::vec3 ContactPoint;
+    Manifold m;
+    bool collided = false;
 
-    glm::vec3 rA;
-    glm::vec3 rB;
+    // Very basic double dispatch
+    if (a->CollisionShape->Type == ShapeType::Sphere && b->CollisionShape->Type == ShapeType::Sphere)
+    {
+        collided = IntersectSphereSphere(a, b, m);
+    }
+    else if (a->CollisionShape->Type == ShapeType::Sphere && b->CollisionShape->Type == ShapeType::Box)
+    {
+        collided = IntersectSphereBox(a, b, m);
+    }
+    else if (a->CollisionShape->Type == ShapeType::Box && b->CollisionShape->Type == ShapeType::Sphere)
+    {
+        collided = IntersectSphereBox(b, a, m); // Flip
+        if (collided) m.Normal = -m.Normal;
+    }
+    else if (a->CollisionShape->Type == ShapeType::Box && b->CollisionShape->Type == ShapeType::Box)
+    {
+        collided = IntersectBoxBox(a, b, m);
+    }
+    // Mesh collisions would loop over triangles here and perform Triangle-Sphere or Triangle-Box tests
 
-    float NormalMass;
-    float Bias;
+    if (collided)
+    {
+        manifolds.push_back(m);
+    }
+}
 
-    float AccumulatedNormalImpulse = 0.0f;
-    float AccumulatedTangentImpulse = 0.0f;
+struct BodyState {
+    glm::vec3 Position;
+    glm::quat Orientation;
+    glm::vec3 LinearVelocity;
+    glm::vec3 AngularVelocity;
 };
 
-class ContactSolver
-{
-public:
-    void Solve(
-        std::vector<ContactManifold>& manifolds,
-        float dt,
-        int iterations = 10
-    );
-};
+// Map of EntityID -> State
+using PhysicsSnapshot = std::map<uint32_t, BodyState>;
 
 class PhysicsWorld
 {
 public:
-    explicit PhysicsWorld(Scene* scene);
-    ~PhysicsWorld();
+    glm::vec3 Gravity{ 0.0f, -9.81f, 0.0f };
+    std::vector<RigidBody*> Bodies;
+    std::vector<Manifold> Contacts;
 
-    void Step(float dt);
-    void Shutdown();
+    ~PhysicsWorld()
+    {
+        for (auto b : Bodies) delete b;
+    }
 
-    RigidBody& CreateRigidBody();
-    Collider& CreateCollider(RigidBody& body, Shape* shape);
+    RigidBody* CreateBody(const glm::vec3& pos, Shape* shape, float mass = 1.0f)
+    {
+        RigidBody* body = new RigidBody();
+        body->Position = pos;
+        body->CollisionShape = shape;
+        body->Mass = mass;
+        body->RecalculateMassProperties();
+        body->UpdateWorldInertia();
+        body->UpdateAABB();
+        Bodies.push_back(body);
+        return body;
+    }
+
+    void SetState(const PhysicsSnapshot& snapshot)
+    {
+        for (auto* body : Bodies)
+        {
+            if (snapshot.find(body->ID) != snapshot.end())
+            {
+                const auto& state = snapshot.at(body->ID);
+                body->Position = state.Position;
+                body->Orientation = state.Orientation;
+                body->LinearVelocity = state.LinearVelocity;
+                body->AngularVelocity = state.AngularVelocity;
+                body->UpdateAABB();
+                body->UpdateWorldInertia();
+            }
+        }
+    }
+
+    void Step(float dt)
+    {
+        // 1. Integrate Forces (Gravity)
+        for (auto b : Bodies) {
+            if (b->Type == BodyType::Dynamic) {
+                b->LinearVelocity += (b->ForceAccumulator * b->InverseMass + Gravity) * dt;
+                b->AngularVelocity += (b->InverseInertiaWorld * b->TorqueAccumulator) * dt;
+
+                // Damping
+                b->LinearVelocity *= 0.98f;
+                b->AngularVelocity *= 0.98f;
+            }
+            b->ForceAccumulator = glm::vec3(0.0f);
+            b->TorqueAccumulator = glm::vec3(0.0f);
+        }
+
+        // 2. Broadphase & Narrowphase
+        Contacts.clear();
+        // Naive O(N^2) loop for simplicity. 
+        // In production, replace this with your DynamicAABBTree queries.
+        for (size_t i = 0; i < Bodies.size(); ++i)
+        {
+            for (size_t j = i + 1; j < Bodies.size(); ++j)
+            {
+                RigidBody* A = Bodies[i];
+                RigidBody* B = Bodies[j];
+
+                if (A->Type == BodyType::Static && B->Type == BodyType::Static) continue;
+
+                if (A->WorldAABB.Overlaps(B->WorldAABB)) {
+                    Dispatch(A, B, Contacts);
+                }
+            }
+        }
+
+        // 3. Solve Constraints (Sequential Impulses)
+        for (int i = 0; i < 10; ++i)
+        { // 10 Iterations
+            SolveConstraints();
+        }
+
+        // 4. Integrate Velocities
+        for (auto b : Bodies)
+        {
+            if (b->Type == BodyType::Dynamic)
+            {
+                b->Position += b->LinearVelocity * dt;
+
+                glm::quat q = glm::quat(0.0f, b->AngularVelocity.x, b->AngularVelocity.y, b->AngularVelocity.z);
+                b->Orientation += (q * b->Orientation) * 0.5f * dt;
+                b->Orientation = glm::normalize(b->Orientation);
+
+                b->UpdateWorldInertia();
+                b->UpdateAABB();
+            }
+        }
+    }
 
 private:
-    Scene* m_Scene = nullptr;
+    void SolveConstraints()
+    {
+        for (auto& m : Contacts)
+        {
+            RigidBody* A = m.BodyA;
+            RigidBody* B = m.BodyB;
 
-    std::vector<RigidBody> m_RigidBodies;
-    std::vector<Collider> m_Colliders;
+            for (auto& c : m.Contacts) {
+                glm::vec3 rA = c.WorldPointA - A->Position;
+                glm::vec3 rB = c.WorldPointB - B->Position;
 
-    std::vector<ContactManifold> m_ContactManifolds;
+                // Relative Velocity
+                glm::vec3 vA = A->LinearVelocity + glm::cross(A->AngularVelocity, rA);
+                glm::vec3 vB = B->LinearVelocity + glm::cross(B->AngularVelocity, rB);
+                glm::vec3 vRel = vB - vA;
 
-    BroadPhase* m_BroadPhase = nullptr;
-    NarrowPhase m_NarrowPhase;
-    Integrator m_Integrator;
+                // 1. Penetration Correction (Positional) - "Baumgarte Stabilization"
+                // Stops objects from sinking, pushes them apart slightly based on depth
+                float beta = 0.2f; // Correction percentage
+                float slop = 0.01f; // Penetration allowance
+                float bias = (beta / 0.016f) * std::max(0.0f, c.Depth - slop);
 
-    const glm::vec3 m_Gravity = { 0.0f, -9.81f, 0.0f };
+                // 2. Velocity Solver
+                float velAlongNormal = glm::dot(vRel, m.Normal);
+
+                // Do not resolve if velocities are separating
+                if (velAlongNormal > 0) continue;
+
+                float restitution = std::min(A->Restitution, B->Restitution);
+                float jv = -(1.0f + restitution) * velAlongNormal + bias; // +bias handles the sinking
+
+                // Effective Mass (Inverse)
+                glm::vec3 raxn = glm::cross(rA, m.Normal);
+                glm::vec3 rbxn = glm::cross(rB, m.Normal);
+
+                float invMassSum = A->InverseMass + B->InverseMass +
+                    glm::dot(raxn, A->InverseInertiaWorld * raxn) +
+                    glm::dot(rbxn, B->InverseInertiaWorld * rbxn);
+
+                float lambda = jv / invMassSum;
+
+                glm::vec3 impulse = m.Normal * lambda;
+
+                // Apply Impulse
+                if (A->Type == BodyType::Dynamic) {
+                    A->LinearVelocity -= impulse * A->InverseMass;
+                    A->AngularVelocity -= A->InverseInertiaWorld * glm::cross(rA, impulse);
+                }
+                if (B->Type == BodyType::Dynamic) {
+                    B->LinearVelocity += impulse * B->InverseMass;
+                    B->AngularVelocity += B->InverseInertiaWorld * glm::cross(rB, impulse);
+                }
+
+                // Note: Friction impulses would go here (Tangent calculations)
+            }
+        }
+    }
 };

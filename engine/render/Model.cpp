@@ -241,6 +241,18 @@ Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& ind
     m_VertexArray->SetIndexBuffer(m_IndexBuffer);
 
     m_VertexArray->Unbind();
+
+    AABB aabb;
+    aabb.Min = glm::vec3(-FLT_MAX);
+    aabb.Max = glm::vec3(FLT_MAX);
+
+    for (const auto& v : vertices)
+    {
+        aabb.Min = glm::min(aabb.Min, v.Position);
+        aabb.Max = glm::max(aabb.Max, v.Position);
+    }
+
+    m_LocalAABB = aabb;
 }
 
 void Mesh::Bind() const

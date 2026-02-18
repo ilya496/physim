@@ -9,6 +9,7 @@
 #include "asset/Asset.h"
 #include "render/Camera.h"
 #include "render/LightType.h"
+#include "physics/AABB.h"
 
 // Core
 struct IDComponent
@@ -48,18 +49,18 @@ struct TransformComponent
     }
 };
 
+struct AABBComponent
+{
+    AABB WorldAABB;
+    bool Dirty = true; // idk if needed
+};
+
 // Render
 struct MeshRenderComponent
 {
     AssetHandle Mesh;
     AssetHandle Material;
 };
-
-// struct CameraComponent
-// {
-//     Camera Camera;
-//     bool Primary = true;
-// };
 
 struct LightComponent
 {
@@ -78,8 +79,9 @@ struct RigidBodyComponent
     float Friction = 0.6f;
     bool IsStatic = false;
 
-    glm::vec3 Velocity{ 0 };
-    glm::vec3 AngularVelocity{ 0 };
+    void* RuntimeBody = nullptr;
+    // glm::vec3 Velocity{ 0 };
+    // glm::vec3 AngularVelocity{ 0 };
 };
 
 
@@ -101,41 +103,7 @@ struct BoxColliderComponent
 };
 
 
-// struct CapsuleColliderComponent
-// {
-//     float Radius = 0.5f;
-//     float Height = 1.0f;
-//     glm::vec3 Offset = glm::vec3(0.0f);
-
-//     bool IsTrigger = false;
-// };
-
 // struct MeshColliderComonent
-// {
-
-// };
-
-struct PhysicsMaterialComponent
-{
-    float Friction = 0.5f;
-    float Restitution = 0.1f;
-    float Density = 1.0f;
-};
-
-// struct FixedJointComponent
-// {
-//     entt::entity ConnectedEntity = entt::null;
-
-//     glm::vec3 Anchor = glm::vec3(0.0f);
-//     void* RuntimeJoint = nullptr;
-// };
-
-// struct DistanceJointComponent
-// {
-
-// };
-
-// struct HingeJointComponent
 // {
 
 // };

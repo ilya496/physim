@@ -41,6 +41,7 @@ private:
     std::shared_ptr<Mesh> CreateGrid(int halfSize, float spacing);
     std::shared_ptr<Mesh> CreateAxisMesh(float length);
     void RenderGrid();
+    void RenderColliders(Scene& scene);
 
 private:
     FrameData m_Frame;
@@ -70,4 +71,7 @@ private:
 
     std::shared_ptr<Shader> m_GizmoShader;
     std::shared_ptr<Shader> m_GridShader;
+
+    std::shared_ptr<Mesh> m_DebugCube;
+    std::shared_ptr<Mesh> m_DebugSphere;
 };

@@ -28,6 +28,92 @@ inline std::shared_ptr<Mesh> CreateAxisMeshZ(float length)
     return std::make_shared<Mesh>(v, std::vector<uint32_t>{0, 1});
 }
 
+static std::shared_ptr<Mesh> CreateWireCube()
+{
+    std::vector<Vertex> v =
+    {
+        {{-1,-1,-1},{},{}}, {{1,-1,-1},{},{}},
+        {{1,1,-1},{},{}},   {{-1,1,-1},{},{}},
+        {{-1,-1,1},{},{}},  {{1,-1,1},{},{}},
+        {{1,1,1},{},{}},    {{-1,1,1},{},{}}
+    };
+
+    std::vector<uint32_t> i =
+    {
+        0,1, 1,2, 2,3, 3,0, // back
+        4,5, 5,6, 6,7, 7,4, // front
+        0,4, 1,5, 2,6, 3,7  // connections
+    };
+
+    return std::make_shared<Mesh>(v, i);
+}
+
+static std::shared_ptr<Mesh> CreateWireSphere(int segments = 32)
+{
+    std::vector<Vertex> vertices;
+    std::vector<uint32_t> indices;
+
+    uint32_t index = 0;
+
+    // Create multiple latitude circles
+    int latitudes = 8;
+    for (int lat = 0; lat < latitudes; lat++)
+    {
+        float phi = (float)lat / (latitudes - 1) * glm::pi<float>();
+
+        for (int i = 0; i <= segments; i++)
+        {
+            float theta = (float)i / segments * glm::two_pi<float>();
+
+            glm::vec3 p = {
+                sin(phi) * cos(theta),
+                cos(phi),
+                sin(phi) * sin(theta)
+            };
+
+            vertices.push_back({ p, {}, {} });
+
+            if (i > 0)
+            {
+                indices.push_back(index - 1);
+                indices.push_back(index);
+            }
+
+            index++;
+        }
+    }
+
+    // Create longitude lines
+    for (int lon = 0; lon < segments; lon++)
+    {
+        float theta = (float)lon / segments * glm::two_pi<float>();
+
+        for (int i = 0; i <= segments; i++)
+        {
+            float phi = (float)i / segments * glm::pi<float>();
+
+            glm::vec3 p = {
+                sin(phi) * cos(theta),
+                cos(phi),
+                sin(phi) * sin(theta)
+            };
+
+            vertices.push_back({ p, {}, {} });
+
+            if (i > 0)
+            {
+                indices.push_back(index - 1);
+                indices.push_back(index);
+            }
+
+            index++;
+        }
+    }
+
+    return std::make_shared<Mesh>(vertices, indices);
+}
+
+
 void Renderer::Init(const RenderTarget& target)
 {
     glCreateFramebuffers(1, &m_ShadowFBO);
@@ -71,6 +157,10 @@ void Renderer::Init(const RenderTarget& target)
     m_GridMesh = CreateGrid(100, 1.0f);
     m_AxisX = CreateAxisMeshX(100.0f);
     m_AxisZ = CreateAxisMeshZ(100.0f);
+
+    m_DebugCube = CreateWireCube();
+    m_DebugSphere = CreateWireSphere();
+
 }
 
 void Renderer::BeginFrame(const FrameData& frame)
@@ -112,12 +202,16 @@ void Renderer::RenderScene(Scene& scene)
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     CollectLights(scene);
     ForwardPass(scene);
+    // RenderColliders(scene);
 
+    // EditorPass(scene);
 
     // OUTLINE PASS
     glStencilMask(0x00);
     glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
     OutlinePass(scene);
+
+    RenderColliders(scene);
 
     // FULL RESET
     glStencilMask(0xFF);
@@ -283,6 +377,8 @@ void Renderer::EditorPass(Scene& scene)
         }
     }
 
+    RenderColliders(scene);
+
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
 }
@@ -414,5 +510,66 @@ void Renderer::RenderGrid()
     // Restore depth for rest of pipeline
     // glDepthMask(GL_TRUE);
     // glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+}
+
+void Renderer::RenderColliders(Scene& scene)
+{
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+
+    glDisable(GL_STENCIL_TEST);
+
+    m_GizmoShader->Bind();
+    m_GizmoShader->SetMat4f("u_View", m_Frame.View);
+    m_GizmoShader->SetMat4f("u_Projection", m_Frame.Projection);
+
+    auto& registry = scene.GetRegistry();
+
+    // ----------------------------
+    // Box Colliders
+    // ----------------------------
+    {
+        auto view = registry.view<TransformComponent, BoxColliderComponent>();
+
+        for (auto [entity, transform, box] : view.each())
+        {
+            glm::mat4 model =
+                glm::translate(glm::mat4(1.0f), transform.Translation) *
+                glm::mat4_cast(transform.Rotation) *
+                glm::scale(glm::mat4(1.0f),
+                    box.HalfExtents * 2.0f);
+
+            m_GizmoShader->SetVec3f("u_Color", { 0.0f, 1.0f, 0.0f });
+            m_GizmoShader->SetMat4f("u_Model", model);
+
+            m_DebugCube->DrawLines();
+        }
+    }
+
+    // ----------------------------
+    // Sphere Colliders
+    // ----------------------------
+    {
+        auto view = registry.view<TransformComponent, SphereColliderComponent>();
+
+        for (auto [entity, transform, sphere] : view.each())
+        {
+            glm::mat4 model =
+                glm::translate(glm::mat4(1.0f), transform.Translation) *
+                glm::mat4_cast(transform.Rotation) *
+                glm::scale(glm::mat4(1.0f),
+                    glm::vec3(sphere.Radius));
+
+            m_GizmoShader->SetVec3f("u_Color", { 0.2f, 0.8f, 1.0f });
+            m_GizmoShader->SetMat4f("u_Model", model);
+
+            m_DebugSphere->DrawLines();
+        }
+    }
+
     glDisable(GL_BLEND);
 }

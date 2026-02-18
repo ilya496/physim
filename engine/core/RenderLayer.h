@@ -10,12 +10,6 @@ struct Ray
     glm::vec3 Direction;
 };
 
-struct AABB
-{
-    glm::vec3 Min;
-    glm::vec3 Max;
-};
-
 enum class GizmoMode
 {
     None,

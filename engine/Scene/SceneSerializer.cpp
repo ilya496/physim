@@ -134,8 +134,8 @@ bool SceneSerializer::Serialize(const std::filesystem::path& filepath)
             e["RigidBodyComponent"] = {
                 { "Mass", rb.Mass },
                 { "IsStatic", rb.IsStatic },
-                { "Velocity", rb.Velocity },
-                { "AngularVelocity", rb.AngularVelocity },
+                // { "Velocity", rb.Velocity },
+                // { "AngularVelocity", rb.AngularVelocity },
                 { "Restitution", rb.Restitution },
                 { "Friction", rb.Friction }
             };
@@ -216,8 +216,8 @@ bool SceneSerializer::Deserialize(const std::filesystem::path& filepath)
             auto& rb = entity.AddComponent<RigidBodyComponent>();
             rb.Mass = e["RigidBodyComponent"]["Mass"];
             rb.IsStatic = e["RigidBodyComponent"]["IsStatic"];
-            rb.Velocity = e["RigidBodyComponent"]["Velocity"];
-            rb.AngularVelocity = e["RigidBodyComponent"]["AngularVelocity"];
+            // rb.Velocity = e["RigidBodyComponent"]["Velocity"];
+            // rb.AngularVelocity = e["RigidBodyComponent"]["AngularVelocity"];
             rb.Restitution = e["RigidBodyComponent"]["Restitution"];
             rb.Friction = e["RigidBodyComponent"]["Friction"];
         }

@@ -234,7 +234,10 @@ void EditorLayer::DrawViewport()
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 
-    ImGui::Begin("Viewport", nullptr);
+    ImGui::Begin("Viewport", nullptr,
+        ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoScrollWithMouse
+    );
 
     ImVec2 viewportMin = ImGui::GetCursorScreenPos();
     ImVec2 viewportSize = ImGui::GetContentRegionAvail();
@@ -340,7 +343,75 @@ void EditorLayer::DrawViewport()
 
     ImGui::PopStyleVar(2);
 
+    // ========================================
+    // Simulation Info (Top Right Overlay)
+    // ========================================
 
+    SimulationState simState = m_SceneController.GetState();
+
+    const char* stateStr = "Stopped";
+    switch (simState)
+    {
+    case SimulationState::Running: stateStr = "Running"; break;
+    case SimulationState::Paused:  stateStr = "Paused";  break;
+    case SimulationState::Stopped: stateStr = "Stopped"; break;
+    }
+
+    int currentFrame = m_SceneController.GetCurrentFrameIndex();
+    int totalFrames = m_SceneController.GetTotalFrames();
+
+    // Build info string
+    char infoBuffer[128];
+    snprintf(infoBuffer, sizeof(infoBuffer),
+        "State: %s\nFrame: %d / %d",
+        stateStr,
+        totalFrames > 0 ? currentFrame : 0,
+        totalFrames > 0 ? totalFrames - 1 : 0
+    );
+
+    // Measure text size for proper right alignment
+    ImVec2 textSize = ImGui::CalcTextSize(infoBuffer);
+
+    // Padding from edge
+    const float textPadding = 10.0f;
+
+    ImVec2 textPos = {
+        viewportMax.x - textSize.x - textPadding,
+        viewportMin.y + textPadding
+    };
+
+    // Background panel
+    ImVec2 bgMin = {
+        textPos.x - 8.0f,
+        textPos.y - 6.0f
+    };
+
+    ImVec2 bgMax = {
+        textPos.x + textSize.x + 8.0f,
+        textPos.y + textSize.y + 6.0f
+    };
+
+    dl->AddRectFilled(
+        bgMin,
+        bgMax,
+        IM_COL32(20, 20, 20, 200),
+        6.0f
+    );
+
+    dl->AddRect(
+        bgMin,
+        bgMax,
+        IM_COL32(60, 60, 60, 255),
+        6.0f
+    );
+
+    dl->AddText(
+        textPos,
+        IM_COL32(255, 255, 255, 255),
+        infoBuffer
+    );
+
+    ImGui::SetCursorScreenPos(viewportMin);
     ImGui::InvisibleButton("##ViewportDropTarget", viewportSize,
         ImGuiButtonFlags_MouseButtonLeft |
         ImGuiButtonFlags_MouseButtonRight);
@@ -371,9 +442,9 @@ void EditorLayer::DrawViewport()
 
     if (dragHover)
     {
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        // ImDrawList* drawList = ImGui::GetWindowDrawList();
 
-        drawList->AddRect(
+        dl->AddRect(
             viewportMin,
             viewportMax,
             IM_COL32(80, 160, 255, 220), // blue highlight

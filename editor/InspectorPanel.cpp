@@ -42,6 +42,8 @@ void InspectorPanel::DrawEntityInspector(std::shared_ptr<Scene> scene, entt::ent
     DrawComponent<TransformComponent>("Transform", scene, entity);
     DrawComponent<MeshRenderComponent>("Mesh", scene, entity);
     DrawComponent<RigidBodyComponent>("Rigid Body", scene, entity);
+    DrawComponent<BoxColliderComponent>("Box Collider", scene, entity);
+    DrawComponent<SphereColliderComponent>("Sphere Collider", scene, entity);
 
     ImGui::Separator();
 
@@ -100,18 +102,30 @@ void InspectorPanel::DrawComponent(const char* name, std::shared_ptr<Scene> scen
             ImGui::DragFloat3("Scale", &component.Scale.x, 0.1f, 0.1f);
         }
 
-        if constexpr (std::is_same_v<T, MeshRenderComponent>)
-        {
-            ImGui::Text("Mesh Handle: %llu", component.Mesh);
-            ImGui::Text("Material Handle: %llu", component.Material);
-        }
+        // if constexpr (std::is_same_v<T, MeshRenderComponent>)
+        // {
+        //     ImGui::Text("Mesh Handle: %llu", component.Mesh);
+        //     ImGui::Text("Material Handle: %llu", component.Material);
+        // }
 
         if constexpr (std::is_same_v<T, RigidBodyComponent>)
         {
-            ImGui::Text("Mass: %f", component.Mass);
-            ImGui::Text("Restituion: %f", component.Restitution);
-            ImGui::Text("Friction: %f", component.Friction);
-            ImGui::Checkbox("Is static:", &component.IsStatic);
+            ImGui::DragFloat("Mass", &component.Mass, 0.1f);
+            ImGui::DragFloat("Restitution", &component.Restitution, 0.01f);
+            ImGui::DragFloat("Friction", &component.Friction, 0.01f);
+            ImGui::Checkbox("Is static", &component.IsStatic);
+        }
+
+        if constexpr (std::is_same_v<T, BoxColliderComponent>)
+        {
+            ImGui::Text("Box Collider");
+            ImGui::DragFloat3("Half Extents", &component.HalfExtents.x, 1.0f);
+        }
+
+        if constexpr (std::is_same_v<T, SphereColliderComponent>)
+        {
+            ImGui::Text("Sphere Collider");
+            ImGui::DragFloat("Radius", &component.Radius, 1.0f);
         }
 
         ImGui::TreePop();
@@ -148,14 +162,27 @@ void InspectorPanel::DrawAddComponentPopup(std::shared_ptr<Scene> scene, entt::e
         if (!registry.any_of<BoxColliderComponent>(entity))
         {
             if (ImGui::MenuItem("Box collider"))
+            {
+                // Remove any existing collider first
+                if (registry.any_of<SphereColliderComponent>(entity))
+                    registry.remove<SphereColliderComponent>(entity);
+
                 registry.emplace<BoxColliderComponent>(entity);
+            }
         }
 
         if (!registry.any_of<SphereColliderComponent>(entity))
         {
             if (ImGui::MenuItem("Sphere collider"))
+            {
+                // Remove any existing collider first
+                if (registry.any_of<BoxColliderComponent>(entity))
+                    registry.remove<BoxColliderComponent>(entity);
+
                 registry.emplace<SphereColliderComponent>(entity);
+            }
         }
+
 
         ImGui::EndPopup();
     }
