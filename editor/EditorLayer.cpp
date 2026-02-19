@@ -101,7 +101,7 @@ void EditorLayer::OnRender()
         {
             OpenProject(*projectPath);
             m_State = EditorState::Editor;
-            m_SceneController.SetEditorScene(Project::GetActive()->GetActiveScene());
+            // m_SceneController.SetEditorScene(Project::GetActive()->GetActiveScene());
         }
     }
     else
@@ -360,7 +360,6 @@ void EditorLayer::DrawViewport()
     int currentFrame = m_SceneController.GetCurrentFrameIndex();
     int totalFrames = m_SceneController.GetTotalFrames();
 
-    // Build info string
     char infoBuffer[128];
     snprintf(infoBuffer, sizeof(infoBuffer),
         "State: %s\nFrame: %d / %d",
@@ -369,10 +368,8 @@ void EditorLayer::DrawViewport()
         totalFrames > 0 ? totalFrames - 1 : 0
     );
 
-    // Measure text size for proper right alignment
     ImVec2 textSize = ImGui::CalcTextSize(infoBuffer);
 
-    // Padding from edge
     const float textPadding = 10.0f;
 
     ImVec2 textPos = {
@@ -380,7 +377,6 @@ void EditorLayer::DrawViewport()
         viewportMin.y + textPadding
     };
 
-    // Background panel
     ImVec2 bgMin = {
         textPos.x - 8.0f,
         textPos.y - 6.0f

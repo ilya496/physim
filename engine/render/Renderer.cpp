@@ -377,7 +377,7 @@ void Renderer::EditorPass(Scene& scene)
         }
     }
 
-    RenderColliders(scene);
+    // RenderColliders(scene);
 
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
