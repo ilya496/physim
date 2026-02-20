@@ -65,7 +65,7 @@ void SceneController::Stop()
 
     ClearHistory();
 
-    Project::GetActive()->SetActiveScene(m_EditorScene);
+    // Project::GetActive()->SetActiveScene(m_EditorScene);
 }
 
 // ------------------------------------------------------------

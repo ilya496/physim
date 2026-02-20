@@ -101,7 +101,7 @@ void EditorLayer::OnRender()
         {
             OpenProject(*projectPath);
             m_State = EditorState::Editor;
-            // m_SceneController.SetEditorScene(Project::GetActive()->GetActiveScene());
+            m_SceneController.SetEditorScene(Project::GetActive()->GetActiveScene());
         }
     }
     else
@@ -282,8 +282,8 @@ void EditorLayer::DrawViewport()
     const float spacing = 6.0f;
 
     float totalWidth =
-        buttonSize * 3.0f +
-        spacing * 2.0f +
+        buttonSize * 5.0f +
+        spacing * 4.0f +
         padding * 2.0f;
 
     ImVec2 toolbarMin = {
@@ -322,6 +322,13 @@ void EditorLayer::DrawViewport()
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
+    if (ImGui::Button("<", ImVec2(buttonSize, buttonSize)))
+    {
+        m_SceneController.StepFrame(-1);
+    }
+
+    ImGui::SameLine(0.0f, spacing);
+
     if (ImGui::ImageButton("##PlayButton", (ImTextureID)m_PlayButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
     {
         m_SceneController.Play();
@@ -339,6 +346,13 @@ void EditorLayer::DrawViewport()
     if (ImGui::ImageButton("##StopButton", (ImTextureID)m_StopButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
     {
         m_SceneController.Stop();
+    }
+
+    ImGui::SameLine(0.0f, spacing);
+
+    if (ImGui::Button(">", ImVec2(buttonSize, buttonSize)))
+    {
+        m_SceneController.StepFrame(1);
     }
 
     ImGui::PopStyleVar(2);
