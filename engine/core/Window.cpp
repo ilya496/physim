@@ -10,6 +10,9 @@ Window::Window(const WindowProps& props)
     : m_Width(props.width), m_Height(props.height), m_Title(props.title), m_VSync(props.VSync)
 {
     Init();
+
+    if (props.Maximized)
+        Maximize();
 }
 
 Window::~Window()
@@ -157,97 +160,76 @@ void Window::SetFullscreen(bool enabled)
 
 void Window::InitCallbacks()
 {
-    // -------- Window Resize --------
     glfwSetWindowSizeCallback(m_Window, [](GLFWwindow* wnd, int w, int h)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            // if (!window->m_EventCallback) return;
 
             WindowResizeEvent ev(w, h);
-            // window->m_EventCallback(ev);
             EventBus::Publish(ev);
         });
 
-    // -------- Window Close --------
     glfwSetWindowCloseCallback(m_Window, [](GLFWwindow* wnd)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            // if (!window->m_EventCallback) return;
 
             WindowCloseEvent ev{};
-            // window->m_EventCallback(ev);
             EventBus::Publish(ev);
         });
 
-    // -------- Key Events --------
     glfwSetKeyCallback(m_Window, [](GLFWwindow* wnd, int key, int sc, int action, int mods)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            // if (!window->m_EventCallback) return;
 
             if (action == GLFW_PRESS)
             {
                 KeyPressEvent ev(key, false);
-                // window->m_EventCallback(ev);
                 EventBus::Publish(ev);
             }
             else if (action == GLFW_REPEAT)
             {
                 KeyPressEvent ev(key, true);
-                // window->m_EventCallback(ev);
                 EventBus::Publish(ev);
             }
             else if (action == GLFW_RELEASE)
             {
                 KeyReleaseEvent ev(key);
-                // window->m_EventCallback(ev);
                 EventBus::Publish(ev);
             }
         });
 
-    // -------- Mouse Button Events --------
     glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* wnd, int button, int action, int mods)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            // if (!window->m_EventCallback) return;
 
             if (action == GLFW_PRESS)
             {
                 MouseButtonPressEvent ev(button);
-                // window->m_EventCallback(ev);
                 EventBus::Publish(ev);
             }
             else if (action == GLFW_RELEASE)
             {
                 MouseButtonReleaseEvent ev(button);
-                // window->m_EventCallback(ev);
                 EventBus::Publish(ev);
             }
         });
 
-    // -------- Mouse Move --------
     glfwSetCursorPosCallback(m_Window, [](GLFWwindow* wnd, double x, double y)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            // if (!window->m_EventCallback) return;
 
             glm::vec2 currentPos = { (float)x, (float)y };
             glm::vec2 delta = currentPos - window->m_LastMousePos;
             window->m_LastMousePos = currentPos;
 
             MouseMoveEvent ev(currentPos.x, currentPos.y, delta.x, delta.y);
-            // window->m_EventCallback(ev);
             EventBus::Publish(ev);
         });
 
-    // -------- Mouse Scroll --------
     glfwSetScrollCallback(m_Window, [](GLFWwindow* wnd, double x, double y)
         {
             Window* window = (Window*)glfwGetWindowUserPointer(wnd);
-            // if (!window->m_EventCallback) return;
 
             MouseScrollEvent ev((float)x, (float)y);
-            // window->m_EventCallback(ev);
             EventBus::Publish(ev);
         });
 }

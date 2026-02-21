@@ -6,21 +6,18 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-// #include "Event.h"
-
 struct WindowProps
 {
     std::string title = "Physim";
     int width = 1920;
     int height = 1080;
     bool VSync = false;
+    bool Maximized = true;
 };
 
 class Window
 {
 public:
-    // using EventCallbackFn = std::function<void(Event&)>;
-
     Window(const WindowProps& props = {});
     ~Window();
 
