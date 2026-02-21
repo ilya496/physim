@@ -2,16 +2,11 @@
 
 #include "EditorContext.h"
 
-SceneHierarchyPanel::SceneHierarchyPanel()
-{
-    m_MeshIcon = Texture::Create("../editor/icons/mesh-icon.png", false);
-    m_LightIcon = Texture::Create("../editor/icons/light-icon.png", false);
-    // m_EmptyIcon = Texture::Create("../editor/icons/entity-icon.png");
-}
-
 void SceneHierarchyPanel::Draw(std::shared_ptr<Scene> scene)
 {
     ImGui::Begin("Scene Hierarchy");
+
+    Entity entityToDelete{};
 
     ImGuiTreeNodeFlags rootFlags =
         ImGuiTreeNodeFlags_DefaultOpen |
@@ -28,16 +23,29 @@ void SceneHierarchyPanel::Draw(std::shared_ptr<Scene> scene)
         for (auto entityHandle : view)
         {
             Entity entity{ entityHandle, scene.get() };
-            DrawEntityNode(entity);
+
+            if (DrawEntityNode(entity))
+                entityToDelete = entity;
         }
 
         ImGui::TreePop();
     }
 
+    if (entityToDelete)
+    {
+        if (EditorContext::GetSelectedEntity() == entityToDelete)
+            EditorContext::SetSelectedEntity({});
+
+        scene->DestroyEntity(entityToDelete);
+    }
+
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered())
         EditorContext::SetSelectedEntity({});
 
-    if (ImGui::BeginPopupContextWindow(nullptr, ImGuiPopupFlags_MouseButtonRight))
+    if (ImGui::BeginPopupContextWindow(
+        "SceneHierarchyWindowContext",
+        ImGuiPopupFlags_MouseButtonRight |
+        ImGuiPopupFlags_NoOpenOverItems))
     {
         if (ImGui::MenuItem("Add Empty Entity"))
             scene->CreateEntity("Empty Entity");
@@ -65,8 +73,10 @@ void SceneHierarchyPanel::Draw(std::shared_ptr<Scene> scene)
     ImGui::End();
 }
 
-void SceneHierarchyPanel::DrawEntityNode(Entity entity)
+bool SceneHierarchyPanel::DrawEntityNode(Entity entity)
 {
+    bool entityDeleted = false;
+
     const std::string& name = entity.GetName();
 
     ImGuiTreeNodeFlags flags =
@@ -80,7 +90,7 @@ void SceneHierarchyPanel::DrawEntityNode(Entity entity)
 
     ImGui::PushID(entity.GetHandle());
 
-    bool opened = ImGui::TreeNodeEx(
+    ImGui::TreeNodeEx(
         "##Entity",
         flags,
         "%s",
@@ -90,16 +100,21 @@ void SceneHierarchyPanel::DrawEntityNode(Entity entity)
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         EditorContext::SetSelectedEntity(entity);
 
+    if (EditorContext::GetSelectedEntity() == entity &&
+        ImGui::IsKeyPressed(ImGuiKey_Delete))
+    {
+        entityDeleted = true;
+    }
+
+    if (ImGui::BeginPopupContextItem())
+    {
+        if (ImGui::MenuItem("Delete"))
+            entityDeleted = true;
+
+        ImGui::EndPopup();
+    }
+
     ImGui::PopID();
-}
 
-ImTextureID SceneHierarchyPanel::GetEntityIcon(Entity entity)
-{
-    if (entity.HasComponent<MeshRenderComponent>())
-        return (ImTextureID)m_MeshIcon->GetRendererID();
-
-    if (entity.HasComponent<LightComponent>())
-        return (ImTextureID)m_LightIcon->GetRendererID();
-
-    return (ImTextureID)m_EmptyIcon->GetRendererID();
+    return entityDeleted;
 }
