@@ -527,6 +527,9 @@ void Renderer::RenderColliders(Scene& scene)
     m_GizmoShader->SetMat4f("u_View", m_Frame.View);
     m_GizmoShader->SetMat4f("u_Projection", m_Frame.Projection);
 
+    // to prevent z-fighting
+    constexpr float offset = 1.005f;
+
     auto& registry = scene.GetRegistry();
 
     // ----------------------------
@@ -541,7 +544,7 @@ void Renderer::RenderColliders(Scene& scene)
                 glm::translate(glm::mat4(1.0f), transform.Translation) *
                 glm::mat4_cast(transform.Rotation) *
                 glm::scale(glm::mat4(1.0f),
-                    box.HalfExtents * 2.0f);
+                    box.HalfExtents * 2.0f * offset);
 
             m_GizmoShader->SetVec3f("u_Color", { 0.0f, 1.0f, 0.0f });
             m_GizmoShader->SetMat4f("u_Model", model);
@@ -562,7 +565,7 @@ void Renderer::RenderColliders(Scene& scene)
                 glm::translate(glm::mat4(1.0f), transform.Translation) *
                 glm::mat4_cast(transform.Rotation) *
                 glm::scale(glm::mat4(1.0f),
-                    glm::vec3(sphere.Radius));
+                    glm::vec3(sphere.Radius) * offset);
 
             m_GizmoShader->SetVec3f("u_Color", { 0.2f, 0.8f, 1.0f });
             m_GizmoShader->SetMat4f("u_Model", model);
