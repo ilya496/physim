@@ -32,6 +32,8 @@ private:
     void SetupImGuiFonts(const char* fontPath);
     void BeginDockspace();
     void DrawViewport();
+    void DrawSimulationInfo(const ImVec2& viewportMin, const ImVec2& viewportMax);
+    void DrawToolbar(const ImVec2& viewportMin, const ImVec2& viewportSize);
 
     void OpenProject(const std::filesystem::path& path);
     void CreateNewProject();

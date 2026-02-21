@@ -272,154 +272,8 @@ void EditorLayer::DrawViewport()
         return;
     }
 
-    // ===============================
-// Viewport top-center toolbar
-// ===============================
-
-    const float buttonSize = 25.0f;
-    const float padding = 6.0f;
-    const float toolbarHeight = buttonSize + padding * 2.0f;
-    const float spacing = 6.0f;
-
-    float totalWidth =
-        buttonSize * 5.0f +
-        spacing * 4.0f +
-        padding * 2.0f;
-
-    ImVec2 toolbarMin = {
-        viewportMin.x + (viewportSize.x - totalWidth) * 0.5f,
-        viewportMin.y + 8.0f
-    };
-
-    ImVec2 toolbarMax = {
-        toolbarMin.x + totalWidth,
-        toolbarMin.y + toolbarHeight
-    };
-
-    // Background
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(
-        toolbarMin,
-        toolbarMax,
-        IM_COL32(25, 25, 25, 220),
-        6.0f
-    );
-
-    // Border
-    dl->AddRect(
-        toolbarMin,
-        toolbarMax,
-        IM_COL32(60, 60, 60, 255),
-        6.0f
-    );
-
-    // Buttons
-    ImGui::SetCursorScreenPos({
-        toolbarMin.x + padding,
-        toolbarMin.y + padding
-        });
-
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
-
-    if (ImGui::Button("<", ImVec2(buttonSize, buttonSize)))
-    {
-        m_SceneController.StepFrame(-1);
-    }
-
-    ImGui::SameLine(0.0f, spacing);
-
-    if (ImGui::ImageButton("##PlayButton", (ImTextureID)m_PlayButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
-    {
-        m_SceneController.Play();
-    }
-
-    ImGui::SameLine(0.0f, spacing);
-
-    if (ImGui::ImageButton("##PauseButton", (ImTextureID)m_PauseButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
-    {
-        m_SceneController.Pause();
-    }
-
-    ImGui::SameLine(0.0f, spacing);
-
-    if (ImGui::ImageButton("##StopButton", (ImTextureID)m_StopButtonIcon->GetRendererID(), ImVec2(buttonSize, buttonSize)))
-    {
-        m_SceneController.Stop();
-    }
-
-    ImGui::SameLine(0.0f, spacing);
-
-    if (ImGui::Button(">", ImVec2(buttonSize, buttonSize)))
-    {
-        m_SceneController.StepFrame(1);
-    }
-
-    ImGui::PopStyleVar(2);
-
-    // ========================================
-    // Simulation Info (Top Right Overlay)
-    // ========================================
-
-    SimulationState simState = m_SceneController.GetState();
-
-    const char* stateStr = "Stopped";
-    switch (simState)
-    {
-    case SimulationState::Running: stateStr = "Running"; break;
-    case SimulationState::Paused:  stateStr = "Paused";  break;
-    case SimulationState::Stopped: stateStr = "Stopped"; break;
-    }
-
-    int currentFrame = m_SceneController.GetCurrentFrameIndex();
-    int totalFrames = m_SceneController.GetTotalFrames();
-
-    char infoBuffer[128];
-    snprintf(infoBuffer, sizeof(infoBuffer),
-        "State: %s\nFrame: %d / %d",
-        stateStr,
-        totalFrames > 0 ? currentFrame : 0,
-        totalFrames > 0 ? totalFrames - 1 : 0
-    );
-
-    ImVec2 textSize = ImGui::CalcTextSize(infoBuffer);
-
-    const float textPadding = 10.0f;
-
-    ImVec2 textPos = {
-        viewportMax.x - textSize.x - textPadding,
-        viewportMin.y + textPadding
-    };
-
-    ImVec2 bgMin = {
-        textPos.x - 8.0f,
-        textPos.y - 6.0f
-    };
-
-    ImVec2 bgMax = {
-        textPos.x + textSize.x + 8.0f,
-        textPos.y + textSize.y + 6.0f
-    };
-
-    dl->AddRectFilled(
-        bgMin,
-        bgMax,
-        IM_COL32(20, 20, 20, 200),
-        6.0f
-    );
-
-    dl->AddRect(
-        bgMin,
-        bgMax,
-        IM_COL32(60, 60, 60, 255),
-        6.0f
-    );
-
-    dl->AddText(
-        textPos,
-        IM_COL32(255, 255, 255, 255),
-        infoBuffer
-    );
+    DrawToolbar(viewportMin, viewportSize);
+    DrawSimulationInfo(viewportMin, viewportMax);
 
     ImGui::SetCursorScreenPos(viewportMin);
     ImGui::InvisibleButton("##ViewportDropTarget", viewportSize,
@@ -444,7 +298,6 @@ void EditorLayer::DrawViewport()
                 auto project = Project::GetActive();
                 auto assetManager = project->GetAssetManager();
                 project->GetActiveScene()->CreateMeshEntity("New Mesh", handle, assetManager->GetDefaultMaterial());
-                // ImportMesh(path);
             }
         }
         ImGui::EndDragDropTarget();
@@ -452,12 +305,10 @@ void EditorLayer::DrawViewport()
 
     if (dragHover)
     {
-        // ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-        dl->AddRect(
+        ImGui::GetWindowDrawList()->AddRect(
             viewportMin,
             viewportMax,
-            IM_COL32(80, 160, 255, 220), // blue highlight
+            IM_COL32(80, 160, 255, 220),
             0.0f,
             0,
             2.0f
@@ -525,4 +376,180 @@ void EditorLayer::DrawViewport()
 
     ImGui::End();
     ImGui::PopStyleVar(2);
+}
+
+void EditorLayer::DrawToolbar(
+    const ImVec2& viewportMin,
+    const ImVec2& viewportSize)
+{
+    constexpr float ButtonSize = 25.0f;
+    constexpr float Padding = 6.0f;
+    constexpr float Spacing = 6.0f;
+    constexpr float CornerRounding = 6.0f;
+    constexpr float FrameRounding = 4.0f;
+    constexpr float TopOffset = 4.0f;
+
+    constexpr int ButtonCount = 5;
+
+    const float toolbarHeight = ButtonSize + Padding * 2.0f;
+    const float totalWidth =
+        (ButtonSize * ButtonCount) +
+        (Spacing * (ButtonCount - 1)) +
+        (Padding * 2.0f);
+
+    const ImVec2 toolbarMin = {
+        viewportMin.x + (viewportSize.x - totalWidth) * 0.5f,
+        viewportMin.y + TopOffset
+    };
+
+    const ImVec2 toolbarMax = {
+        toolbarMin.x + totalWidth,
+        toolbarMin.y + toolbarHeight
+    };
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    drawList->AddRectFilled(
+        toolbarMin,
+        toolbarMax,
+        IM_COL32(25, 25, 25, 220),
+        CornerRounding
+    );
+
+    drawList->AddRect(
+        toolbarMin,
+        toolbarMax,
+        IM_COL32(60, 60, 60, 255),
+        CornerRounding
+    );
+
+    ImGui::SetCursorScreenPos({
+        toolbarMin.x + Padding,
+        toolbarMin.y + Padding
+        });
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, FrameRounding);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
+
+    const ImVec2 size(ButtonSize, ButtonSize);
+
+    if (ImGui::Button("<", size))
+        m_SceneController.StepFrame(-1);
+
+    ImGui::SameLine(0.0f, Spacing);
+
+    if (ImGui::ImageButton(
+        "##PlayButton",
+        (ImTextureID)m_PlayButtonIcon->GetRendererID(),
+        size))
+    {
+        m_SceneController.Play();
+    }
+
+    ImGui::SameLine(0.0f, Spacing);
+
+    if (ImGui::ImageButton(
+        "##PauseButton",
+        (ImTextureID)m_PauseButtonIcon->GetRendererID(),
+        size))
+    {
+        m_SceneController.TogglePause();
+    }
+
+    ImGui::SameLine(0.0f, Spacing);
+
+    if (ImGui::ImageButton(
+        "##StopButton",
+        (ImTextureID)m_StopButtonIcon->GetRendererID(),
+        size))
+    {
+        m_SceneController.Stop();
+    }
+
+    ImGui::SameLine(0.0f, Spacing);
+
+    if (ImGui::Button(">", size))
+        m_SceneController.StepFrame(1);
+
+    ImGui::PopStyleVar(2);
+}
+
+void EditorLayer::DrawSimulationInfo(
+    const ImVec2& viewportMin,
+    const ImVec2& viewportMax
+)
+{
+    const SimulationState simState = m_SceneController.GetState();
+
+    constexpr const char* StateStrings[] = {
+        "Stopped",
+        "Running",
+        "Paused"
+    };
+
+    const char* stateStr = "Unknown";
+    switch (simState)
+    {
+    case SimulationState::Stopped: stateStr = StateStrings[0]; break;
+    case SimulationState::Running: stateStr = StateStrings[1]; break;
+    case SimulationState::Paused:  stateStr = StateStrings[2]; break;
+    }
+
+    const int totalFrames = m_SceneController.GetTotalFrames();
+    const int currentFrame = m_SceneController.GetCurrentFrameIndex();
+
+    const int displayFrame = (totalFrames > 0) ? currentFrame : 0;
+    const int displayTotal = (totalFrames > 0) ? totalFrames - 1 : 0;
+
+    char buffer[128];
+    std::snprintf(buffer, sizeof(buffer),
+        "State: %s\nFrame: %d / %d",
+        stateStr,
+        displayFrame,
+        displayTotal
+    );
+
+    constexpr float OuterPadding = 10.0f;
+    constexpr float InnerPaddingX = 8.0f;
+    constexpr float InnerPaddingY = 6.0f;
+    constexpr float CornerRounding = 6.0f;
+
+    const ImVec2 textSize = ImGui::CalcTextSize(buffer);
+
+    const ImVec2 textPos = {
+        viewportMax.x - textSize.x - OuterPadding,
+        viewportMin.y + OuterPadding
+    };
+
+    const ImVec2 bgMin = {
+        textPos.x - InnerPaddingX,
+        textPos.y - InnerPaddingY
+    };
+
+    const ImVec2 bgMax = {
+        textPos.x + textSize.x + InnerPaddingX,
+        textPos.y + textSize.y + InnerPaddingY
+    };
+
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    drawList->AddRectFilled(
+        bgMin,
+        bgMax,
+        IM_COL32(20, 20, 20, 200),
+        CornerRounding
+    );
+
+    drawList->AddRect(
+        bgMin,
+        bgMax,
+        IM_COL32(60, 60, 60, 255),
+        CornerRounding
+    );
+
+    drawList->AddText(
+        textPos,
+        IM_COL32(255, 255, 255, 255),
+        buffer
+    );
 }
