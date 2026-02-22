@@ -9,6 +9,7 @@
 #include "Shader.h"
 #include "Buffer.h"
 #include "VertexArray.h"
+#include "MeshPrimitive.h"
 #include "asset/Asset.h"
 #include "project/Project.h"
 #include "asset/AssetManager.h"
@@ -57,8 +58,6 @@ public:
 //     ShaderSource Sources;
 //     std::shared_ptr<Shader> ShaderData;
 // };
-
-enum class MeshPrimitive { CUBE, PLANE, UV_SPHERE, ICO_SPHERE, CYLINDER };
 
 struct Vertex
 {

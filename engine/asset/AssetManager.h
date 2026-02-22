@@ -5,6 +5,7 @@
 #include "project/Project.h"
 #include <unordered_map>
 #include <memory>
+#include "render/MeshPrimitive.h"
 
 using AssetMap = std::unordered_map<AssetHandle, std::shared_ptr<Asset>>;
 using AssetRegistry = std::unordered_map<AssetHandle, AssetMetadata>;
@@ -37,6 +38,8 @@ public:
     AssetHandle ImportAsset(const std::filesystem::path& filePath);
     AssetHandle CreateMaterial(const MaterialDesc& desc);
     AssetHandle GetDefaultMaterial();
+    AssetHandle CreatePrimitiveMesh(MeshPrimitive primitive);
+    AssetHandle GetDefaultMesh(MeshPrimitive primitive);
 
     const AssetMetadata& GetMetadata(AssetHandle handle) const;
     const std::filesystem::path& GetFilePath(AssetHandle handle) const;
@@ -48,7 +51,7 @@ public:
     bool DeserializeAssetRegistry();
 private:
     AssetMap m_LoadedAssets;
+    AssetMap m_RuntimeAssets; // not serialized
+    std::unordered_map<MeshPrimitive, AssetHandle> m_DefaultMeshes;
     AssetRegistry m_AssetRegistry;
-
-    // std::filesystem::path m_RegistryPath = "AssetRegistry.json";
 };

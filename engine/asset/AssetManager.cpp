@@ -42,6 +42,9 @@ bool AssetManager::IsAssetLoaded(AssetHandle handle) const
 
 std::shared_ptr<Asset> AssetManager::GetAsset(AssetHandle handle)
 {
+    if (m_RuntimeAssets.find(handle) != m_RuntimeAssets.end())
+        return m_RuntimeAssets[handle];
+
     if (!IsAssetHandleValid(handle))
         return nullptr;
 
@@ -116,6 +119,58 @@ AssetHandle AssetManager::GetDefaultMaterial()
 
     s_DefaultMaterial = CreateMaterial(desc);
     return s_DefaultMaterial;
+}
+
+// AssetHandle AssetManager::CreateCube()
+// {
+//     AssetHandle handle;
+//     std::shared_ptr<Mesh> mesh = Mesh::Generate(MeshPrimitive::CUBE);
+
+//     auto asset = std::make_shared<MeshAsset>();
+//     asset->Handle = handle;
+//     asset->MeshData = mesh;
+
+//     m_RuntimeAssets.emplace(handle, asset);
+
+//     return handle;
+// }
+
+// AssetHandle AssetManager::GetDefaultCube()
+// {
+//     static AssetHandle s_DefaultCube = 0;
+
+//     if (s_DefaultCube != 0)
+//         return s_DefaultCube;
+
+//     s_DefaultCube = CreateCube();
+//     return s_DefaultCube;
+// }
+
+AssetHandle AssetManager::CreatePrimitiveMesh(MeshPrimitive primitive)
+{
+    AssetHandle handle;
+
+    auto mesh = Mesh::Generate(primitive);
+
+    auto asset = std::make_shared<MeshAsset>();
+    asset->Handle = handle;
+    asset->MeshData = mesh;
+
+    m_RuntimeAssets.emplace(handle, asset);
+
+    return handle;
+}
+
+AssetHandle AssetManager::GetDefaultMesh(MeshPrimitive primitive)
+{
+    auto it = m_DefaultMeshes.find(primitive);
+    if (it != m_DefaultMeshes.end())
+        return it->second;
+
+    AssetHandle handle = CreatePrimitiveMesh(primitive);
+    m_DefaultMeshes.emplace(primitive, handle);
+
+    return handle;
 }
 
 AssetType AssetManager::GetAssetType(AssetHandle handle) const

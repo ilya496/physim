@@ -315,52 +315,7 @@ void EditorLayer::DrawViewport()
         );
     }
 
-    static bool showAddMeshPopup = false;
-
-    if (hovered && Input::IsKeyPressed(KeyCode::A) && Input::IsKeyPressed(KeyCode::LeftShift))
-    {
-        showAddMeshPopup = true;
-    }
-
-    if (showAddMeshPopup)
-    {
-        ImGui::OpenPopup("Add Mesh");
-    }
-
-    if (ImGui::BeginPopupModal("Add Mesh", &showAddMeshPopup))
-    {
-        if (ImGui::MenuItem("Cube"))
-        {
-            showAddMeshPopup = false;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (ImGui::MenuItem("UV Sphere"))
-        {
-            showAddMeshPopup = false;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (ImGui::MenuItem("Ico Sphere"))
-        {
-            showAddMeshPopup = false;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (ImGui::MenuItem("Plane"))
-        {
-            showAddMeshPopup = false;
-            ImGui::CloseCurrentPopup();
-        }
-
-        if (ImGui::MenuItem("Cylinder"))
-        {
-            showAddMeshPopup = false;
-            ImGui::CloseCurrentPopup();
-        }
-
-        ImGui::EndPopup();
-    }
+    ImGui::PopStyleVar(2);
 
     EventBus::Publish(ViewportEvent{
         mousePos.x,
@@ -374,8 +329,51 @@ void EditorLayer::DrawViewport()
 
     m_ViewportHovered = hovered;
 
+    // popup
+    if (hovered &&
+        Input::IsKeyPressed(KeyCode::C) &&
+        Input::IsKeyPressed(KeyCode::LeftShift))
+    {
+        ImGui::OpenPopup("AddMeshContextMenu");
+    }
+
+    if (ImGui::BeginPopup("AddMeshContextMenu"))
+    {
+        ImGui::SeparatorText("Add Mesh");
+        if (ImGui::MenuItem("Cube"))
+        {
+            auto project = Project::GetActive();
+            auto assetManager = project->GetAssetManager();
+            project->GetActiveScene()->CreateMeshEntity(
+                "New Mesh",
+                assetManager->GetDefaultMesh(MeshPrimitive::CUBE),
+                assetManager->GetDefaultMaterial()
+            );
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::MenuItem("UV Sphere"))
+        {
+            // TODO: add sphere mesh
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (ImGui::MenuItem("Plane"))
+        {
+            auto project = Project::GetActive();
+            auto assetManager = project->GetAssetManager();
+            project->GetActiveScene()->CreateMeshEntity(
+                "New Mesh",
+                assetManager->GetDefaultMesh(MeshPrimitive::PLANE),
+                assetManager->GetDefaultMaterial()
+            );
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
+
     ImGui::End();
-    ImGui::PopStyleVar(2);
 }
 
 void EditorLayer::DrawToolbar(
