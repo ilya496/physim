@@ -3,27 +3,15 @@
 #include "Components.h"
 #include "project/Project.h"
 
-// ------------------------------------------------------------
-// Constructor
-// ------------------------------------------------------------
-
 SceneController::SceneController()
 {
 }
-
-// ------------------------------------------------------------
-// Scene Setup
-// ------------------------------------------------------------
 
 void SceneController::SetEditorScene(const std::shared_ptr<Scene>& scene)
 {
     Stop(); // ensure clean state
     m_EditorScene = scene;
 }
-
-// ------------------------------------------------------------
-// Playback Controls
-// ------------------------------------------------------------
 
 void SceneController::Play()
 {
@@ -32,21 +20,16 @@ void SceneController::Play()
 
     if (m_State == SimulationState::Stopped)
     {
-        // 1. Clone editor scene
         m_RuntimeScene = m_EditorScene->Copy();
-
-        // 2. Create physics world
         m_PhysicsWorld = std::make_unique<PhysicsWorld>();
 
-        // 3. Initialize physics bodies
         InitializePhysicsFromScene();
-
-        // 4. Reset timeline
         ClearHistory();
         m_Accumulator = 0.0f;
+
+        Project::GetActive()->SetActiveScene(m_RuntimeScene);
     }
 
-    Project::GetActive()->SetActiveScene(m_RuntimeScene);
     m_State = SimulationState::Running;
 }
 
@@ -56,8 +39,19 @@ void SceneController::Pause()
         m_State = SimulationState::Paused;
 }
 
+void SceneController::TogglePause()
+{
+    if (m_State == SimulationState::Running)
+        m_State = SimulationState::Paused;
+    else if (m_State == SimulationState::Paused)
+        m_State = SimulationState::Running;
+}
+
 void SceneController::Stop()
 {
+    if (m_State == SimulationState::Stopped)
+        return;
+
     m_State = SimulationState::Stopped;
 
     m_PhysicsWorld.reset();
@@ -65,12 +59,9 @@ void SceneController::Stop()
 
     ClearHistory();
 
-    // Project::GetActive()->SetActiveScene(m_EditorScene);
+    if (m_EditorScene)
+        Project::GetActive()->SetActiveScene(m_EditorScene);
 }
-
-// ------------------------------------------------------------
-// Update Loop (Fixed Timestep)
-// ------------------------------------------------------------
 
 void SceneController::Update(float dt)
 {
@@ -93,10 +84,6 @@ void SceneController::Update(float dt)
 
     SyncSceneToPhysics();
 }
-
-// ------------------------------------------------------------
-// Physics Initialization
-// ------------------------------------------------------------
 
 void SceneController::InitializePhysicsFromScene()
 {
@@ -138,10 +125,6 @@ void SceneController::InitializePhysicsFromScene()
     }
 }
 
-// ------------------------------------------------------------
-// Timeline Recording
-// ------------------------------------------------------------
-
 void SceneController::RecordFrame()
 {
     PhysicsSnapshot snapshot;
@@ -157,9 +140,8 @@ void SceneController::RecordFrame()
     }
 
     m_History.push_back(std::move(snapshot));
-    m_CurrentFrameIndex = static_cast<int>(m_History.size()) - 1;
+    m_CurrentFrameIndex = (int)m_History.size() - 1;
 
-    // Limit memory usage
     if (m_History.size() > s_MaxHistoryFrames)
     {
         m_History.pop_front();
@@ -173,16 +155,12 @@ void SceneController::ClearHistory()
     m_CurrentFrameIndex = 0;
 }
 
-// ------------------------------------------------------------
-// Timeline Navigation
-// ------------------------------------------------------------
-
 void SceneController::SetFrame(int frameIndex)
 {
     if (m_State == SimulationState::Stopped)
         return;
 
-    if (frameIndex < 0 || frameIndex >= static_cast<int>(m_History.size()))
+    if (frameIndex < 0 || frameIndex >= (int)m_History.size())
         return;
 
     m_State = SimulationState::Paused;
@@ -196,26 +174,54 @@ void SceneController::SetFrame(int frameIndex)
 
 void SceneController::StepFrame(int direction)
 {
-    SetFrame(m_CurrentFrameIndex + direction);
-}
+    if (m_State == SimulationState::Stopped || !m_PhysicsWorld)
+        return;
 
-// ------------------------------------------------------------
-// Scene Synchronization
-// ------------------------------------------------------------
+    int target = m_CurrentFrameIndex + direction;
+
+    // step backwards
+    if (direction < 0)
+    {
+        if (target >= 0)
+            SetFrame(target);
+    }
+
+    // step forward
+    if (direction > 0)
+    {
+        // next frame already recorded
+        if (target < (int)m_History.size())
+        {
+            SetFrame(target);
+        }
+        else
+        {
+            // at the end -> simulate next step
+            m_State = SimulationState::Paused;
+            m_PhysicsWorld->Step(m_FixedDeltaTime);
+            RecordFrame();
+
+            SetFrame(m_CurrentFrameIndex);
+        }
+    }
+}
 
 void SceneController::SyncSceneToPhysics()
 {
     if (!m_RuntimeScene || m_History.empty())
         return;
 
+    auto& registry = m_RuntimeScene->GetRegistry();
     const auto& snapshot = m_History[m_CurrentFrameIndex];
 
     for (const auto& [entityID, state] : snapshot)
     {
-        auto& registry = m_RuntimeScene->GetRegistry();
-        auto entity = static_cast<entt::entity>(entityID);
-        auto& tr = registry.get<TransformComponent>(entity);
+        entt::entity entity = (entt::entity)entityID;
 
+        if (!registry.valid(entity) || !registry.all_of<TransformComponent>(entity))
+            continue;
+
+        auto& tr = registry.get<TransformComponent>(entity);
         tr.Translation = state.Position;
         tr.Rotation = state.Orientation;
     }

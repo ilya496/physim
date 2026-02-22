@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <deque>
-#include <unordered_map>
 
 #include "Scene.h"
 #include "physics/PhysicsWorld.h"
@@ -33,26 +32,18 @@ public:
     SceneController();
     ~SceneController() = default;
 
-    // --------------------------------------------------------
-    // Scene Assignment
-    // --------------------------------------------------------
     void SetEditorScene(const std::shared_ptr<Scene>& scene);
 
     const std::shared_ptr<Scene>& GetRuntimeScene() const { return m_RuntimeScene; }
     SimulationState GetState() const { return m_State; }
 
-    // --------------------------------------------------------
-    // Playback Controls
-    // --------------------------------------------------------
     void Play();
     void Pause();
+    void TogglePause();
     void Stop();
 
     void Update(float dt);
 
-    // --------------------------------------------------------
-    // Timeline Controls
-    // --------------------------------------------------------
     void SetFrame(int frameIndex);
     void StepFrame(int direction);
 
@@ -60,7 +51,6 @@ public:
     int GetTotalFrames() const { return static_cast<int>(m_History.size()); }
 
 private:
-
     void InitializePhysicsFromScene();
     void RecordFrame();
     void SyncSceneToPhysics();
@@ -68,28 +58,16 @@ private:
 
 private:
 
-    // --------------------------------------------------------
-    // Scene References
-    // --------------------------------------------------------
     std::shared_ptr<Scene> m_EditorScene;
     std::shared_ptr<Scene> m_RuntimeScene;
 
-    // --------------------------------------------------------
-    // Physics
-    // --------------------------------------------------------
     std::unique_ptr<PhysicsWorld> m_PhysicsWorld;
 
-    // --------------------------------------------------------
-    // Simulation State
-    // --------------------------------------------------------
     SimulationState m_State = SimulationState::Stopped;
 
     float m_Accumulator = 0.0f;
     const float m_FixedDeltaTime = 1.0f / 60.0f;
 
-    // --------------------------------------------------------
-    // Timeline / History
-    // --------------------------------------------------------
     std::deque<PhysicsSnapshot> m_History;
     int m_CurrentFrameIndex = 0;
 
