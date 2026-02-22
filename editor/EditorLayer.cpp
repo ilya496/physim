@@ -85,6 +85,9 @@ void EditorLayer::OnUpdate(float dt)
         }
     }
 
+    if (m_State == EditorState::Editor)
+        HandleSimulationShortcuts();
+
     BeginDockspace();
 }
 
@@ -434,6 +437,9 @@ void EditorLayer::DrawToolbar(
     if (ImGui::Button("<", size))
         m_SceneController.StepFrame(-1);
 
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Step Back (Left Arrow)");
+
     ImGui::SameLine(0.0f, Spacing);
 
     if (ImGui::ImageButton(
@@ -443,6 +449,9 @@ void EditorLayer::DrawToolbar(
     {
         m_SceneController.Play();
     }
+
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Play (Ctrl + P)");
 
     ImGui::SameLine(0.0f, Spacing);
 
@@ -454,6 +463,9 @@ void EditorLayer::DrawToolbar(
         m_SceneController.TogglePause();
     }
 
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Pause / Resume (Space)");
+
     ImGui::SameLine(0.0f, Spacing);
 
     if (ImGui::ImageButton(
@@ -464,10 +476,16 @@ void EditorLayer::DrawToolbar(
         m_SceneController.Stop();
     }
 
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Stop (Ctrl + .)");
+
     ImGui::SameLine(0.0f, Spacing);
 
     if (ImGui::Button(">", size))
         m_SceneController.StepFrame(1);
+
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Step Forward (Right Arrow)");
 
     ImGui::PopStyleVar(2);
 }
@@ -550,4 +568,72 @@ void EditorLayer::DrawSimulationInfo(
         IM_COL32(255, 255, 255, 255),
         buffer
     );
+}
+
+void EditorLayer::HandleSimulationShortcuts()
+{
+    ImGuiIO& io = ImGui::GetIO();
+
+    const bool ctrl = io.KeyCtrl;
+
+    const SimulationState state = m_SceneController.GetState();
+
+    if (ctrl && ImGui::IsKeyPressed(ImGuiKey_P, false))
+    {
+        if (state == SimulationState::Stopped ||
+            state == SimulationState::Paused)
+        {
+            m_SceneController.Play();
+        }
+    }
+
+    if (ctrl && ImGui::IsKeyPressed(ImGuiKey_Period, false))
+    {
+        if (state != SimulationState::Stopped)
+            m_SceneController.Stop();
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
+    {
+        if (state == SimulationState::Running)
+            m_SceneController.TogglePause();
+        else if (state == SimulationState::Paused)
+            m_SceneController.TogglePause();
+    }
+
+    if (state != SimulationState::Running)
+    {
+        static float leftArrowHeldTime = 0.0f;
+        static float rightArrowHeldTime = 0.0f;
+        constexpr float HoldDelay = 0.2f;
+        constexpr float RepeatInterval = 0.05f;
+
+        if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
+        {
+            rightArrowHeldTime += ImGui::GetIO().DeltaTime;
+            if (rightArrowHeldTime >= HoldDelay &&
+                std::fmod(rightArrowHeldTime - HoldDelay, RepeatInterval) < ImGui::GetIO().DeltaTime)
+            {
+                m_SceneController.StepFrame(1);
+            }
+        }
+        else
+        {
+            rightArrowHeldTime = 0.0f;
+        }
+
+        if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
+        {
+            leftArrowHeldTime += ImGui::GetIO().DeltaTime;
+            if (leftArrowHeldTime >= HoldDelay &&
+                std::fmod(leftArrowHeldTime - HoldDelay, RepeatInterval) < ImGui::GetIO().DeltaTime)
+            {
+                m_SceneController.StepFrame(-1);
+            }
+        }
+        else
+        {
+            leftArrowHeldTime = 0.0f;
+        }
+    }
 }
