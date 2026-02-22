@@ -544,7 +544,7 @@ void Renderer::RenderColliders(Scene& scene)
                 glm::translate(glm::mat4(1.0f), transform.Translation) *
                 glm::mat4_cast(transform.Rotation) *
                 glm::scale(glm::mat4(1.0f),
-                    box.HalfExtents * 2.0f * offset);
+                    box.HalfExtents * offset);
 
             m_GizmoShader->SetVec3f("u_Color", { 0.0f, 1.0f, 0.0f });
             m_GizmoShader->SetMat4f("u_Model", model);
