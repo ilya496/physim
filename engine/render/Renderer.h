@@ -42,6 +42,7 @@ private:
     std::shared_ptr<Mesh> CreateAxisMesh(float length);
     void RenderGrid();
     void RenderColliders(Scene& scene);
+    void RenderDistanceJoints(Scene& scene);
 
 private:
     FrameData m_Frame;
@@ -74,4 +75,7 @@ private:
 
     std::shared_ptr<Mesh> m_DebugCube;
     std::shared_ptr<Mesh> m_DebugSphere;
+
+    std::shared_ptr<Mesh> m_DebugLine;
+    std::shared_ptr<Mesh> m_DebugAnchorSphere;
 };

@@ -102,8 +102,22 @@ struct BoxColliderComponent
     glm::vec3 HalfExtents{ 0.5f };
 };
 
+struct DistanceJointComponent
+{
+    entt::entity ConnectedEntity;
 
-// struct MeshColliderComonent
+    glm::vec3 LocalAnchorA{ 0.0f };
+    glm::vec3 LocalAnchorB{ 0.0f };
+
+    float TargetLength = 0.0f;
+};
+
+// struct HingeJointComponent
 // {
+//     entt::entity ConnectedEntity;
 
+//     glm::vec3 LocalAnchorA{ 0.0f };
+//     glm::vec3 LocalAnchorB{ 0.0f };
+
+//     glm::vec3 LocalAxisA{ 0,1,0 };
 // };

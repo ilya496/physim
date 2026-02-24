@@ -117,7 +117,8 @@ std::shared_ptr<Scene> Scene::Copy() const
         RigidBodyComponent,
         BoxColliderComponent,
         SphereColliderComponent,
-        LightComponent
+        LightComponent,
+        DistanceJointComponent
     >(newScene->m_Registry, m_Registry, entityMap);
 
     return newScene;

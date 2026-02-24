@@ -35,6 +35,8 @@ public:
     virtual void OnUpdate(float dt) override;
     virtual void OnRender() override;
 
+    void RequestFrameCapture();
+
 private:
     entt::entity PickEntity(float mouseX, float mouseY);
     void CreateFramebuffer(uint32_t width, uint32_t height);
@@ -63,6 +65,8 @@ private:
     EventBus::Subscription m_MouseMoveEvent;
     EventBus::Subscription m_MouseReleaseEvent;
 
+    EventBus::Subscription m_RequestFrameCapture;
+
     bool m_MouseDown[8] = {};
 
     entt::entity m_SelectedEntity = entt::null;
@@ -78,4 +82,7 @@ private:
     bool m_PendingResize = false;
     float m_RequestedWidth = 0;
     float m_RequestedHeight = 0;
+
+    bool m_CaptureNextFrame = false;
+    std::vector<uint8_t> m_CaptureBuffer;
 };

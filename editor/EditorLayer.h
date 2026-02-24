@@ -16,6 +16,12 @@ enum class EditorState
     Editor
 };
 
+enum class ExportMode
+{
+    None,
+    Running
+};
+
 class EditorLayer : public Layer
 {
 public:
@@ -39,6 +45,13 @@ private:
     void OpenProject(const std::filesystem::path& path);
     void CreateNewProject();
 
+    void DrawExportPopup();
+    void StartExport();
+    std::string PadFrame(int frame);
+    void SavePixelsToPNG(const std::vector<uint8_t>& data, uint32_t width, uint32_t height, int currentFrame);
+
+    void FlipImageVertically(uint8_t* data, uint32_t width, uint32_t height);
+
 private:
     Window* m_Window = nullptr;
     EditorState m_State = EditorState::Launcher;
@@ -60,4 +73,15 @@ private:
     std::shared_ptr<Texture> m_PlayButtonIcon;
     std::shared_ptr<Texture> m_PauseButtonIcon;
     std::shared_ptr<Texture> m_StopButtonIcon;
+
+    ExportMode m_ExportMode = ExportMode::None;
+    int m_ExportEndFrame = 0;
+
+    float m_ExportProgress = 0.0f;      // 0.0 → 1.0
+    bool m_ExportRunning = false;
+
+    int m_CurrentExportFrame = 0;
+    std::filesystem::path m_ExportPath;
+    bool m_RequestOpenExportPopup = false;
+    bool m_PendingExportStep = false;
 };

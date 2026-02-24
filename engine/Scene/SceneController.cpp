@@ -3,6 +3,8 @@
 #include "Components.h"
 #include "project/Project.h"
 
+#include <iostream>
+
 SceneController::SceneController()
 {
 }
@@ -113,15 +115,43 @@ void SceneController::InitializePhysicsFromScene()
         RigidBody* body = m_PhysicsWorld->CreateBody(
             tr.Translation,
             shape,
+            rb.IsStatic ? BodyType::Static : BodyType::Dynamic,
             mass
         );
 
         body->Orientation = tr.Rotation;
-        body->Restitution = rb.Restitution;
-        body->Friction = rb.Friction;
+        body->Material.Restitution = rb.Restitution;
+        body->Material.Friction = rb.Friction;
         body->ID = static_cast<uint32_t>(entity);
 
         rb.RuntimeBody = body;
+    }
+
+    // ----------- Create Runtime Constraints -----------
+
+    auto& registry = m_RuntimeScene->GetRegistry();
+
+    // Distance joints
+    // {
+    auto viewDJ = registry.view<DistanceJointComponent, RigidBodyComponent>();
+
+    for (auto [entity, joint, rbA] : viewDJ.each())
+    {
+        auto* rbB = registry.try_get<RigidBodyComponent>(joint.ConnectedEntity);
+        if (!rbB)
+            continue;
+
+        if (!rbA.RuntimeBody || !rbB->RuntimeBody)
+            continue;
+
+        DistanceJoint* j = m_PhysicsWorld->AddDistanceJoint(
+            (RigidBody*)rbA.RuntimeBody,
+            (RigidBody*)rbB->RuntimeBody,
+            joint.LocalAnchorA,
+            joint.LocalAnchorB
+        );
+
+        j->TargetLength = joint.TargetLength;
     }
 }
 
@@ -225,4 +255,31 @@ void SceneController::SyncSceneToPhysics()
         tr.Translation = state.Position;
         tr.Rotation = state.Orientation;
     }
+}
+
+void SceneController::CreateDistanceJoint(entt::entity a,
+    entt::entity b,
+    const glm::vec3& localAnchorA,
+    const glm::vec3& localAnchorB)
+{
+    if (!m_EditorScene)
+        return;
+
+    auto& registry = m_EditorScene->GetRegistry();
+
+    if (!registry.valid(a) || !registry.valid(b))
+        return;
+
+    auto& comp = registry.emplace<DistanceJointComponent>(a);
+    comp.ConnectedEntity = b;
+    comp.LocalAnchorA = localAnchorA;
+    comp.LocalAnchorB = localAnchorB;
+
+    auto& trA = registry.get<TransformComponent>(a);
+    auto& trB = registry.get<TransformComponent>(b);
+
+    glm::vec3 worldA = trA.Translation + trA.Rotation * localAnchorA;
+    glm::vec3 worldB = trB.Translation + trB.Rotation * localAnchorB;
+
+    comp.TargetLength = glm::length(worldA - worldB);
 }

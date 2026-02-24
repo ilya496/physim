@@ -268,6 +268,13 @@ void RenderLayer::OnAttach()
         }
     );
 
+    m_RequestFrameCapture = EventBus::Subscribe<RequestFrameCaptureEvent>(
+        [this](const RequestFrameCaptureEvent& e)
+        {
+            m_CaptureNextFrame = e.CapturePixels;
+        }
+    );
+
     m_Renderer->Init(target);
 
     // glEnable(GL_DEPTH_TEST);
@@ -472,11 +479,32 @@ void RenderLayer::OnRender()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, m_Width, m_Height);
 
-    EventBus::Publish(NewFrameRenderedEvent(
-        m_ColorAttachment,
-        m_Width,
-        m_Height
-    ));
+    NewFrameRenderedEvent event;
+    event.ColorAttachment = m_ColorAttachment;
+    event.Width = m_Width;
+    event.Height = m_Height;
+
+    if (m_CaptureNextFrame)
+    {
+        m_CaptureBuffer.resize(m_Width * m_Height * 4);
+
+        glBindTexture(GL_TEXTURE_2D, m_ColorAttachment);
+        glGetTexImage(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            m_CaptureBuffer.data()
+        );
+
+        event.PixelData = &m_CaptureBuffer;
+        m_CaptureNextFrame = false;
+    }
+    else {
+        event.PixelData = nullptr;
+    }
+
+    EventBus::Publish(event);
 }
 
 void RenderLayer::CreateFramebuffer(uint32_t width, uint32_t height)
@@ -545,4 +573,9 @@ void RenderLayer::ResizeFramebuffer(uint32_t width, uint32_t height)
     target.Height = height;
 
     m_Renderer->OnResize(target);
+}
+
+void RenderLayer::RequestFrameCapture()
+{
+    m_CaptureNextFrame = true;
 }

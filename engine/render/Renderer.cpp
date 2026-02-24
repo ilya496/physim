@@ -5,6 +5,8 @@
 #include <iostream>
 #include "Camera.h"
 #include "EditorContext.h"
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/quaternion.hpp>
 
 inline std::shared_ptr<Mesh> CreateAxisMeshX(float length)
 {
@@ -113,6 +115,18 @@ static std::shared_ptr<Mesh> CreateWireSphere(int segments = 32)
     return std::make_shared<Mesh>(vertices, indices);
 }
 
+static std::shared_ptr<Mesh> CreateDebugLine()
+{
+    std::vector<Vertex> v =
+    {
+        {{0,0,0},{},{}},
+        {{1,0,0},{},{}}
+    };
+
+    std::vector<uint32_t> i = { 0, 1 };
+
+    return std::make_shared<Mesh>(v, i);
+}
 
 void Renderer::Init(const RenderTarget& target)
 {
@@ -160,6 +174,9 @@ void Renderer::Init(const RenderTarget& target)
 
     m_DebugCube = CreateWireCube();
     m_DebugSphere = CreateWireSphere();
+
+    m_DebugLine = CreateDebugLine();
+    m_DebugAnchorSphere = CreateWireSphere(16);
 
 }
 
@@ -574,5 +591,75 @@ void Renderer::RenderColliders(Scene& scene)
         }
     }
 
+    RenderDistanceJoints(scene);
+
     glDisable(GL_BLEND);
+}
+
+void Renderer::RenderDistanceJoints(Scene& scene)
+{
+    auto& registry = scene.GetRegistry();
+
+    auto view = registry.view<DistanceJointComponent>();
+
+    for (auto [entity, joint] : view.each())
+    {
+        if (!registry.valid(joint.ConnectedEntity))
+            continue;
+
+        if (!registry.all_of<TransformComponent>(entity) ||
+            !registry.all_of<TransformComponent>(joint.ConnectedEntity))
+            continue;
+
+        auto& trA = registry.get<TransformComponent>(entity);
+        auto& trB = registry.get<TransformComponent>(joint.ConnectedEntity);
+
+        glm::vec3 worldA =
+            trA.Translation + trA.Rotation * joint.LocalAnchorA;
+
+        glm::vec3 worldB =
+            trB.Translation + trB.Rotation * joint.LocalAnchorB;
+
+        // -------- Draw Rope Line --------
+        {
+            glm::vec3 diff = worldB - worldA;
+            float length = glm::length(diff);
+            if (length < 1e-6f)
+                continue;
+
+            glm::vec3 dir = diff / length;
+
+            glm::mat4 model =
+                glm::translate(glm::mat4(1.0f), worldA) *
+                glm::mat4_cast(glm::rotation(glm::vec3(1, 0, 0), dir)) *
+                glm::scale(glm::mat4(1.0f), glm::vec3(length, 1, 1));
+
+            m_GizmoShader->SetVec3f("u_Color", { 1.0f, 1.0f, 0.0f });
+            m_GizmoShader->SetMat4f("u_Model", model);
+
+            m_DebugLine->DrawLines();
+        }
+
+        // -------- Draw Anchor A --------
+        {
+            glm::mat4 model =
+                glm::translate(glm::mat4(1.0f), worldA) *
+                glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+
+            m_GizmoShader->SetVec3f("u_Color", { 1.0f, 0.2f, 0.2f });
+            m_GizmoShader->SetMat4f("u_Model", model);
+            m_DebugAnchorSphere->DrawLines();
+        }
+
+        // -------- Draw Anchor B --------
+        {
+            glm::mat4 model =
+                glm::translate(glm::mat4(1.0f), worldB) *
+                glm::scale(glm::mat4(1.0f), glm::vec3(0.1f));
+
+            m_GizmoShader->SetVec3f("u_Color", { 0.2f, 1.0f, 0.2f });
+            m_GizmoShader->SetMat4f("u_Model", model);
+            m_DebugAnchorSphere->DrawLines();
+        }
+    }
 }

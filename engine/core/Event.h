@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 enum class EventType {
     None = 0,
@@ -19,6 +20,7 @@ enum class EventType {
     UPDATE_RENDER_SETTINGS_EVENT,
 
     VIEWPORT_EVENT,
+    REQUEST_FRAME_CAPTURE_EVENT,
 };
 
 class Event {
@@ -148,6 +150,7 @@ public:
 class NewFrameRenderedEvent : public Event
 {
 public:
+    NewFrameRenderedEvent() {}
     NewFrameRenderedEvent(uint32_t colorAttachment, uint32_t width, uint32_t height)
         : ColorAttachment(colorAttachment), Width(width), Height(height) {
     }
@@ -158,6 +161,7 @@ public:
 
     uint32_t ColorAttachment;
     uint32_t Width, Height;
+    std::vector<uint8_t>* PixelData = nullptr;
 };
 
 class ViewportEvent : public Event
@@ -187,4 +191,19 @@ public:
     float ViewportWidth;
     float ViewportHeight;
     bool Hovered;
+};
+
+class RequestFrameCaptureEvent : public Event
+{
+public:
+    RequestFrameCaptureEvent(bool capture)
+        : CapturePixels(capture)
+    {
+    }
+
+    static EventType GetStaticType() { return EventType::REQUEST_FRAME_CAPTURE_EVENT; }
+    virtual EventType GetType() const override { return GetStaticType(); }
+    virtual const char* GetName() const override { return "REQUEST_FRAME_CAPTURE_EVENT"; }
+
+    bool CapturePixels = true;
 };

@@ -50,6 +50,13 @@ public:
     int GetCurrentFrameIndex() const { return m_CurrentFrameIndex; }
     int GetTotalFrames() const { return static_cast<int>(m_History.size()); }
 
+    // Editor-side creation
+    void CreateDistanceJoint(entt::entity a, entt::entity b,
+        const glm::vec3& localAnchorA,
+        const glm::vec3& localAnchorB);
+
+    float GetFixedDeltaTime() const { return m_FixedDeltaTime; }
+
 private:
     void InitializePhysicsFromScene();
     void RecordFrame();
