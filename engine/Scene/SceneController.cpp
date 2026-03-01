@@ -11,7 +11,7 @@ SceneController::SceneController()
 
 void SceneController::SetEditorScene(const std::shared_ptr<Scene>& scene)
 {
-    Stop(); // ensure clean state
+    Stop();
     m_EditorScene = scene;
 }
 
@@ -216,17 +216,14 @@ void SceneController::StepFrame(int direction)
             SetFrame(target);
     }
 
-    // step forward
     if (direction > 0)
     {
-        // next frame already recorded
         if (target < (int)m_History.size())
         {
             SetFrame(target);
         }
         else
         {
-            // at the end -> simulate next step
             m_State = SimulationState::Paused;
             m_PhysicsWorld->Step(m_FixedDeltaTime);
             RecordFrame();

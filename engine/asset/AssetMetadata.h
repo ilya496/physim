@@ -9,7 +9,6 @@ struct AssetMetadata
     AssetType Type;
     std::filesystem::path FilePath;
 
-    // for shaders
     std::filesystem::path VertexPath;
     std::filesystem::path FragmentPath;
 

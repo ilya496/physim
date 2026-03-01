@@ -6,18 +6,6 @@
 #include "Scene.h"
 #include "physics/PhysicsWorld.h"
 
-// ------------------------------------------------------------
-// SceneController
-// ------------------------------------------------------------
-// Responsible for:
-// - Creating a runtime clone of the editor scene
-// - Initializing physics bodies from ECS components
-// - Running fixed-timestep simulation
-// - Recording physics state history
-// - Allowing frame scrubbing (timeline navigation)
-// - Synchronizing physics state back to ECS transforms
-// ------------------------------------------------------------
-
 enum class SimulationState
 {
     Stopped = 0,

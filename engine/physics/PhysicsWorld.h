@@ -1,37 +1,4 @@
 #pragma once
-/**
- * PhysicsWorld.h — Engine-Grade Rigid-Body Physics
- *
- * FIXES IN THIS VERSION
- * ─────────────────────
- * [CRITICAL] Warm-start applied on EVERY sub-step from stale frame cache:
- *   Previous code called Cache.WarmStart inside SubStep(), which ran 16× per
- *   frame. Each sub-step re-applied 80% of the PREVIOUS FRAME's impulses on
- *   top of whatever the solver already computed. 16 × 0.8 × big_impact_impulse
- *   = catastrophic energy injection. Fix: warm-start only on sub-step 0.
- *   Sub-steps 1–N inherit velocity state from the previous sub-step's solver,
- *   which is exactly what they should be doing.
- *
- * [CRITICAL] Split-impulse MAX_COR = 0.02 m caused tunneling:
- *   2 cm max correction per sub-step at 16 sub-steps = 32 cm/frame max. A box
- *   dropped from rest at 1 m height hits the ground at ~4.4 m/s; first-contact
- *   penetration can easily exceed 2 cm in one sub-step. Fix: raise to 0.2 m and
- *   run 3 passes of position correction per sub-step. Also use LOCAL contact
- *   coords to recompute lever arms after position has moved (removes the stale-
- *   WorldPoint lever-arm error that grows with substep size).
- *
- * [STABILITY] Rotated-box glitch on landing:
- *   Root cause was the warm-start bug above. Secondary cause: when a box lands
- *   slightly tilted, one or two contact points have depth≈0 and get discarded,
- *   leaving a 1-point contact that has high angular compliance → spin jitter.
- *   Fix: keep contacts with depth >= -SLOP (was -0.005) so borderline points
- *   are retained and clamp their depth to 0 (they contribute to preventing
- *   separation without injecting energy).
- *
- * [STABILITY] DistanceJoint was still accumulating lambda across sub-steps:
- *   BeginStep() / ResetAccumulators() only called once per frame. Fix:
- *   reset in SubStep so the joint re-converges from fresh each sub-step.
- */
 
 #include <vector>
 #include <algorithm>
@@ -52,9 +19,6 @@
 
 #include "AABB.h"
 
- // ============================================================
- //  Shapes
- // ============================================================
 enum class ShapeType { Sphere, Box, TriangleMesh };
 
 struct Shape {
@@ -99,9 +63,6 @@ struct BoxShape : public Shape {
     }
 };
 
-// ============================================================
-//  Material
-// ============================================================
 struct PhysicsMaterial {
     float Restitution = 0.2f;
     float Friction = 0.5f;
@@ -109,9 +70,6 @@ struct PhysicsMaterial {
 inline float CombineRestitution(const PhysicsMaterial& a, const PhysicsMaterial& b) { return std::max(a.Restitution, b.Restitution); }
 inline float CombineFriction(const PhysicsMaterial& a, const PhysicsMaterial& b) { return std::sqrt(a.Friction * b.Friction); }
 
-// ============================================================
-//  RigidBody
-// ============================================================
 enum class BodyType { Static, Kinematic, Dynamic };
 
 struct RigidBody {
@@ -190,12 +148,9 @@ struct RigidBody {
     bool CanMove()    const { return Type == BodyType::Dynamic; }
 };
 
-// ============================================================
-//  Contact / Manifold
-// ============================================================
 struct ContactPoint {
     glm::vec3 WorldPointA, WorldPointB;
-    glm::vec3 LocalPointA, LocalPointB;    // Used for warm-start matching + position correction
+    glm::vec3 LocalPointA, LocalPointB;
     float     Depth = 0.0f;
 
     float NormalImpulse = 0.0f;
@@ -219,14 +174,11 @@ struct Manifold {
     }
 };
 
-// ============================================================
-//  Manifold cache  —  warm-start on first sub-step ONLY
-// ============================================================
 class ManifoldCache {
     struct Cached { glm::vec3 LA, LB; float NI, T0, T1; };
     std::unordered_map<uint64_t, std::vector<Cached>> C;
-    static constexpr float MATCH_SQ = 0.09f;   // 0.3 m match radius in local space
-    static constexpr float WARM_SCALE = 0.85f;   // slight decay avoids re-applying stale impulses
+    static constexpr float MATCH_SQ = 0.09f;
+    static constexpr float WARM_SCALE = 0.85f;
 
 public:
     void WarmStart(Manifold& m) const {
@@ -254,9 +206,6 @@ public:
     void Clear() { C.clear(); }
 };
 
-// ============================================================
-//  Math helpers
-// ============================================================
 inline void BuildTangentBasis(const glm::vec3& n, glm::vec3& t0, glm::vec3& t1) {
     t0 = (std::abs(n.x) >= 0.57735f)
         ? glm::normalize(glm::vec3(n.y, -n.x, 0.0f))
@@ -273,9 +222,6 @@ inline float EffectiveMass(RigidBody* A, RigidBody* B,
         + glm::dot(rBxN, B->InverseInertiaWorld * rBxN);
 }
 
-// ============================================================
-//  3-D Sutherland-Hodgman clipping
-// ============================================================
 static std::vector<glm::vec3> ClipByPlane(const std::vector<glm::vec3>& poly,
     const glm::vec3& n, float d)
 {
@@ -306,9 +252,6 @@ static std::vector<glm::vec3> ClipToRefFace(const std::array<glm::vec3, 4>& iv,
     return p;
 }
 
-// ============================================================
-//  Box face builder
-// ============================================================
 static void GetBoxFace(RigidBody* body, BoxShape* box, int axisIdx, int sign,
     std::array<glm::vec3, 4>& verts, glm::vec3& center, glm::vec3& normal,
     glm::vec3& U, glm::vec3& V, float& hU, float& hV)
@@ -325,9 +268,6 @@ static void GetBoxFace(RigidBody* body, BoxShape* box, int axisIdx, int sign,
     verts[3] = center - U * hU + V * hV;
 }
 
-// ============================================================
-//  SAT overlap (face axes only)
-// ============================================================
 static float SATOverlap(const glm::vec3& axis, BoxShape* bA, RigidBody* rA, BoxShape* bB, RigidBody* rB) {
     glm::mat3 RA = glm::mat3_cast(rA->Orientation), RB = glm::mat3_cast(rB->Orientation);
     float pA = bA->HalfExtents.x * std::abs(glm::dot(RA[0], axis))
@@ -339,9 +279,6 @@ static float SATOverlap(const glm::vec3& axis, BoxShape* bA, RigidBody* rA, BoxS
     return (pA + pB) - std::abs(glm::dot(rB->Position - rA->Position, axis));
 }
 
-// ============================================================
-//  Contact reduction (≤ 4 points)
-// ============================================================
 static void ReduceContacts(std::vector<ContactPoint>& pts) {
     if (pts.size() <= 4) return;
     auto it = std::max_element(pts.begin(), pts.end(),
@@ -359,9 +296,6 @@ static void ReduceContacts(std::vector<ContactPoint>& pts) {
     pts = std::move(r);
 }
 
-// ============================================================
-//  Collision tests
-// ============================================================
 inline bool TestSphereSphere(RigidBody* A, RigidBody* B, Manifold& m) {
     auto* sA = static_cast<SphereShape*>(A->CollisionShape);
     auto* sB = static_cast<SphereShape*>(B->CollisionShape);
@@ -411,11 +345,6 @@ inline bool TestSphereBox(RigidBody* sph, RigidBody* box, Manifold& m) {
     m.Contacts.push_back(c); return true;
 }
 
-// Box-Box: face axes only (no edge-edge).
-// Edge-edge axes cause:
-//   (a) single-contact normals that flicker every frame → jitter
-//   (b) boxes "balancing" stably on a single edge (non-physical)
-// Face-only contacts always produce stable 1–4 point manifolds.
 inline bool TestBoxBox(RigidBody* A, RigidBody* B, Manifold& m) {
     auto* bA = static_cast<BoxShape*>(A->CollisionShape);
     auto* bB = static_cast<BoxShape*>(B->CollisionShape);
@@ -425,7 +354,6 @@ inline bool TestBoxBox(RigidBody* A, RigidBody* B, Manifold& m) {
     int   bestIdx = 0;
     bool  refIsA = true;
 
-    // Test 6 face axes, pick minimum overlap
     auto testFace = [&](const glm::vec3& ax, bool fromA, int idx) -> bool {
         float ov = SATOverlap(ax, bA, A, bB, B);
         if (ov < 0.0f) return false;
@@ -435,8 +363,6 @@ inline bool TestBoxBox(RigidBody* A, RigidBody* B, Manifold& m) {
     for (int i = 0; i < 3; ++i) if (!testFace(RA[i], true, i)) return false;
     for (int i = 0; i < 3; ++i) if (!testFace(RB[i], false, i)) return false;
 
-    // Snap normal to the exact rotation-matrix column — eliminates floating-point
-    // wobble that otherwise causes the axis to flicker between two near-equal faces.
     RigidBody* refBody = refIsA ? A : B;   BoxShape* refBox = refIsA ? bA : bB;
     RigidBody* incBody = refIsA ? B : A;   BoxShape* incBox = refIsA ? bB : bA;
     glm::mat3  refR = glm::mat3_cast(refBody->Orientation);
@@ -448,13 +374,11 @@ inline bool TestBoxBox(RigidBody* A, RigidBody* B, Manifold& m) {
 
     m.BodyA = A; m.BodyB = B; m.Normal = bestAx; m.Contacts.clear();
 
-    // Reference face
     int refSign = (glm::dot(refR[bestIdx], bestAx) >= 0.0f) ? +1 : -1;
     std::array<glm::vec3, 4> refV;
     glm::vec3 refC, refN, refU, refVv; float hU, hV;
     GetBoxFace(refBody, refBox, bestIdx, refSign, refV, refC, refN, refU, refVv, hU, hV);
 
-    // Incident face: most anti-parallel to refNormal
     int   incAx = 0;
     float minDot = FLT_MAX;
     for (int i = 0; i < 3; ++i) {
@@ -466,24 +390,18 @@ inline bool TestBoxBox(RigidBody* A, RigidBody* B, Manifold& m) {
     glm::vec3 incC, incN, incU, incVv; float iHU, iHV;
     GetBoxFace(incBody, incBox, incAx, incSign, incV, incC, incN, incU, incVv, iHU, iHV);
 
-    // Clip incident polygon to reference face side-planes
     auto clipped = ClipToRefFace(incV, refC, refU, refVv, hU, hV);
     if (clipped.empty()) return false;
 
     float refD = glm::dot(refN, refC);
 
-    // Relaxed depth threshold: keep contacts with depth >= -SLOP.
-    // Old code used -0.005 which discarded edge-contact points on rotated boxes
-    // that legitimately lie right at the surface, leaving a 1-point manifold
-    // with poor rotational stability. These near-zero depth points prevent
-    // separation without injecting energy (NormalImpulse clamped to >= 0).
     const float KEEP_THRESHOLD = -0.01f;
 
     for (const auto& p : clipped) {
         float depth = refD - glm::dot(refN, p);
-        if (depth < KEEP_THRESHOLD) continue;        // truly in front of surface → discard
+        if (depth < KEEP_THRESHOLD) continue;
         ContactPoint c;
-        c.Depth = std::max(depth, 0.0f);             // clamp; near-zero points contribute legally
+        c.Depth = std::max(depth, 0.0f);
         glm::vec3 onRef = p + refN * depth;
         c.WorldPointA = refIsA ? onRef : p;
         c.WorldPointB = refIsA ? p : onRef;
@@ -496,9 +414,6 @@ inline bool TestBoxBox(RigidBody* A, RigidBody* B, Manifold& m) {
     return true;
 }
 
-// ============================================================
-//  Dispatcher
-// ============================================================
 static void DispatchCollision(RigidBody* A, RigidBody* B, std::vector<Manifold>& out) {
     if (!A->CollisionShape || !B->CollisionShape) return;
     if (A->IsStatic() && B->IsStatic()) return;
@@ -520,9 +435,6 @@ static void DispatchCollision(RigidBody* A, RigidBody* B, std::vector<Manifold>&
     if (hit && !m.Contacts.empty()) out.push_back(std::move(m));
 }
 
-// ============================================================
-//  Sort-and-Sweep broadphase  O(N log N)
-// ============================================================
 class SortAndSweep {
 public:
     std::vector<std::pair<uint32_t, uint32_t>> Query(const std::vector<RigidBody*>& bodies) {
@@ -551,27 +463,23 @@ public:
     }
 };
 
-// ============================================================
-//  Constraints
-// ============================================================
 struct Constraint {
     RigidBody* BodyA = nullptr;
     RigidBody* BodyB = nullptr;
-    virtual void BeginSubStep() {}                          // called at start of every sub-step
+    virtual void BeginSubStep() {}
     virtual void SolveVelocity(float dt, float invDt) = 0;
     virtual ~Constraint() = default;
 };
 
-// ---- Distance joint ----
 struct DistanceJoint : public Constraint {
     glm::vec3 LocalAnchorA{ 0.0f };
     glm::vec3 LocalAnchorB{ 0.0f };
     float TargetLength = 1.0f;
-    float ERP = 0.2f;     // error-reduction per second fraction
-    float MaxImpulse = 1e6f;     // per sub-step clamp
+    float ERP = 0.2f;
+    float MaxImpulse = 1e6f;
     float AccumLambda = 0.0f;
 
-    void BeginSubStep() override { AccumLambda = 0.0f; }   // reset each sub-step
+    void BeginSubStep() override { AccumLambda = 0.0f; }
 
     void SolveVelocity(float dt, float invDt) override {
         if (!BodyA || !BodyB) return;
@@ -596,91 +504,6 @@ struct DistanceJoint : public Constraint {
     }
 };
 
-// ---- Ball joint (point-to-point, 3 DOF locked) ----
-struct BallJoint : public Constraint {
-    glm::vec3 LocalAnchorA{ 0.0f };
-    glm::vec3 LocalAnchorB{ 0.0f };
-    float     ERP = 0.2f;
-    float     AccumLam[3] = {};
-
-    void BeginSubStep() override { AccumLam[0] = AccumLam[1] = AccumLam[2] = 0.0f; }
-
-    void SolveVelocity(float /*dt*/, float invDt) override {
-        if (!BodyA || !BodyB) return;
-        glm::vec3 wA = BodyA->LocalToWorld(LocalAnchorA);
-        glm::vec3 wB = BodyB->LocalToWorld(LocalAnchorB);
-        glm::vec3 rA = wA - BodyA->Position, rB = wB - BodyB->Position;
-        glm::vec3 posErr = wB - wA;
-        for (int i = 0; i < 3; ++i) {
-            glm::vec3 ax(0.0f); ax[i] = 1.0f;
-            float em = EffectiveMass(BodyA, BodyB, rA, rB, ax);
-            if (em < 1e-10f) continue;
-            float Jv = glm::dot(BodyB->VelocityAt(wB) - BodyA->VelocityAt(wA), ax);
-            float bias = ERP * invDt * posErr[i];
-            float lam = -(Jv + bias) / em;
-            AccumLam[i] += lam;
-            glm::vec3 J = ax * lam;
-            if (BodyA->CanMove()) BodyA->ApplyImpulse(-J, rA);
-            if (BodyB->CanMove()) BodyB->ApplyImpulse(J, rB);
-        }
-    }
-};
-
-// ---- Hinge joint (3 linear + 2 angular DOF locked) ----
-struct HingeJoint : public Constraint {
-    glm::vec3 LocalAnchorA{ 0.0f };
-    glm::vec3 LocalAnchorB{ 0.0f };
-    glm::vec3 LocalAxisA{ 0, 1, 0 };
-    float     ERP = 0.2f;
-    float     AccumLin[3] = {};
-    float     AccumAng[2] = {};
-
-    void BeginSubStep() override {
-        AccumLin[0] = AccumLin[1] = AccumLin[2] = 0.0f;
-        AccumAng[0] = AccumAng[1] = 0.0f;
-    }
-
-    void SolveVelocity(float /*dt*/, float invDt) override {
-        if (!BodyA || !BodyB) return;
-        glm::vec3 wA = BodyA->LocalToWorld(LocalAnchorA);
-        glm::vec3 wB = BodyB->LocalToWorld(LocalAnchorB);
-        glm::vec3 rA = wA - BodyA->Position, rB = wB - BodyB->Position;
-        glm::vec3 posErr = wB - wA;
-
-        // Linear: 3 equality constraints
-        for (int i = 0; i < 3; ++i) {
-            glm::vec3 ax(0.0f); ax[i] = 1.0f;
-            float em = EffectiveMass(BodyA, BodyB, rA, rB, ax);
-            if (em < 1e-10f) continue;
-            float Jv = glm::dot(BodyB->VelocityAt(wB) - BodyA->VelocityAt(wA), ax);
-            float bias = ERP * invDt * posErr[i];
-            float lam = -(Jv + bias) / em;
-            AccumLin[i] += lam;
-            glm::vec3 J = ax * lam;
-            if (BodyA->CanMove()) BodyA->ApplyImpulse(-J, rA);
-            if (BodyB->CanMove()) BodyB->ApplyImpulse(J, rB);
-        }
-
-        // Angular: lock 2 DOF perpendicular to hinge axis
-        glm::vec3 worldAxis = BodyA->Orientation * LocalAxisA;
-        glm::vec3 t0, t1; BuildTangentBasis(worldAxis, t0, t1);
-        for (int i = 0; i < 2; ++i) {
-            glm::vec3 tang = (i == 0) ? t0 : t1;
-            float invM = glm::dot(tang, (BodyA->InverseInertiaWorld + BodyB->InverseInertiaWorld) * tang);
-            if (invM < 1e-10f) continue;
-            float Jv = glm::dot(BodyB->AngularVelocity - BodyA->AngularVelocity, tang);
-            float lam = -Jv / invM;
-            AccumAng[i] += lam;
-            glm::vec3 J = tang * lam;
-            if (BodyA->CanMove()) BodyA->AngularVelocity -= BodyA->InverseInertiaWorld * J;
-            if (BodyB->CanMove()) BodyB->AngularVelocity += BodyB->InverseInertiaWorld * J;
-        }
-    }
-};
-
-// ============================================================
-//  PhysicsWorld
-// ============================================================
 struct BodyState { glm::vec3 Position; glm::quat Orientation; glm::vec3 LinearVelocity; glm::vec3 AngularVelocity; };
 using PhysicsSnapshot = std::map<uint32_t, BodyState>;
 
@@ -689,7 +512,7 @@ public:
     glm::vec3 Gravity{ 0, -9.81f, 0 };
     int   SolverIterations = 25;
     int   SubSteps = 16;
-    int   PositionIterations = 3;       // position correction passes per sub-step
+    int   PositionIterations = 1;
     bool  EnableSleeping = true;
     float SleepTimeThreshold = 0.5f;
     float SleepLinVelThreshold = 0.04f;
@@ -733,25 +556,6 @@ public:
         Constraints.push_back(j); return j;
     }
 
-    BallJoint* AddBallJoint(RigidBody* a, RigidBody* b, const glm::vec3& worldAnchor) {
-        auto* j = new BallJoint();
-        j->BodyA = a; j->BodyB = b;
-        j->LocalAnchorA = a->WorldToLocal(worldAnchor);
-        j->LocalAnchorB = b->WorldToLocal(worldAnchor);
-        Constraints.push_back(j); return j;
-    }
-
-    HingeJoint* AddHingeJoint(RigidBody* a, RigidBody* b,
-        const glm::vec3& worldAnchor, const glm::vec3& worldAxis)
-    {
-        auto* j = new HingeJoint();
-        j->BodyA = a; j->BodyB = b;
-        j->LocalAnchorA = a->WorldToLocal(worldAnchor);
-        j->LocalAnchorB = b->WorldToLocal(worldAnchor);
-        j->LocalAxisA = glm::conjugate(a->Orientation) * glm::normalize(worldAxis);
-        Constraints.push_back(j); return j;
-    }
-
     void SetState(const PhysicsSnapshot& snap) {
         for (auto* b : Bodies) {
             auto it = snap.find(b->ID); if (it == snap.end()) continue;
@@ -773,17 +577,9 @@ public:
         float subDt = dt / float(SubSteps);
 
         for (int s = 0; s < SubSteps; ++s) {
-            // FIX: warm-start only on the first sub-step.
-            //
-            // Calling Cache.WarmStart inside every sub-step caused each of 16
-            // sub-steps to re-apply 85% of the PREVIOUS FRAME's impulses.
-            // For a box that just landed, that previous-frame impulse was large.
-            // 16 × 0.85 × large_impact = massive energy injection each frame.
-            SubStep(subDt, /*doWarmStart=*/ s == 0);
+            SubStep(subDt, s == 0);
         }
 
-        // Store cache AFTER all sub-steps so sub-step N+1 never warm-starts
-        // from sub-step N's impulses within the same frame.
         for (const auto& man : Contacts) Cache.Store(man);
     }
 
@@ -791,7 +587,6 @@ private:
     void SubStep(float dt, bool doWarmStart) {
         const float invDt = 1.0f / dt;
 
-        // 1. Integrate forces → velocities
         for (auto* b : Bodies) {
             if (!b->IsDynamic() || !b->IsAwake) continue;
             b->LinearVelocity += (b->ForceAccumulator * b->InverseMass + Gravity * b->GravityScale) * dt;
@@ -802,14 +597,12 @@ private:
             b->AngularVelocity *= std::exp(-b->AngularDamping * dt);
         }
 
-        // 2. Broadphase + narrowphase
         Contacts.clear();
         for (auto* b : Bodies) b->UpdateAABB();
         for (const auto& [i, j] : Broadphase.Query(Bodies))
             DispatchCollision(Bodies[i], Bodies[j], Contacts);
         for (auto& man : Contacts) { man.BodyA->WakeUp(); man.BodyB->WakeUp(); }
 
-        // 3. Tangent bases + optional warm-start (first sub-step only)
         for (auto& man : Contacts) {
             for (auto& c : man.Contacts) BuildTangentBasis(man.Normal, c.Tangent0, c.Tangent1);
             if (doWarmStart) {
@@ -818,16 +611,13 @@ private:
             }
         }
 
-        // 4. Reset joint accumulators each sub-step
         for (auto* con : Constraints) con->BeginSubStep();
 
-        // 5. Velocity-level PGS
         for (int iter = 0; iter < SolverIterations; ++iter) {
             SolveContactVelocities();
             for (auto* con : Constraints) con->SolveVelocity(dt, invDt);
         }
 
-        // 6. Integrate velocities → positions
         for (auto* b : Bodies) {
             if (!b->IsDynamic() || !b->IsAwake) continue;
             b->Position += b->LinearVelocity * dt;
@@ -836,17 +626,13 @@ private:
                 b->Orientation = glm::normalize(glm::angleAxis(wLen * dt, b->AngularVelocity / wLen) * b->Orientation);
         }
 
-        // 7. Split-impulse position correction — multiple passes, lever arms
-        //    recomputed from LOCAL coords so they stay accurate after step 6.
         for (int pass = 0; pass < PositionIterations; ++pass)
             SolveContactPositions();
 
-        // 8. Update world inertia + AABB
         for (auto* b : Bodies) if (b->IsDynamic()) {
             b->UpdateWorldInertia(); b->UpdateAABB();
         }
 
-        // 9. Sleep
         if (EnableSleeping) TickSleep(dt);
     }
 
@@ -863,10 +649,6 @@ private:
     }
 
     void SolveContactVelocities() {
-        // Restitution only when approaching fast enough.
-        // velN < -REST_THRESH (negative = approaching).
-        // NOT abs(velN) — that was the sky-launch bug: applying restitution
-        // when bodies were already SEPARATING fast.
         const float REST_THRESH = 1.5f;
 
         for (auto& man : Contacts) {
@@ -877,13 +659,11 @@ private:
             for (auto& c : man.Contacts) {
                 glm::vec3 rA = c.WorldPointA - A->Position, rB = c.WorldPointB - B->Position;
 
-                // ── Normal impulse ─────────────────────────────────────────
                 glm::vec3 vRel = B->VelocityAt(c.WorldPointB) - A->VelocityAt(c.WorldPointA);
                 float velN = glm::dot(vRel, man.Normal);
                 float em = EffectiveMass(A, B, rA, rB, man.Normal);
                 if (em < 1e-10f) continue;
 
-                // No Baumgarte — position errors are handled by SolveContactPositions.
                 float coefE = (velN < -REST_THRESH) ? e : 0.0f;
                 float jN = -(1.0f + coefE) * velN / em;
                 float prev = c.NormalImpulse;
@@ -895,7 +675,6 @@ private:
 
                 float maxF = mu * c.NormalImpulse;
 
-                // ── Tangent 0 ──────────────────────────────────────────────
                 vRel = B->VelocityAt(c.WorldPointB) - A->VelocityAt(c.WorldPointA);
                 {
                     float emT = EffectiveMass(A, B, rA, rB, c.Tangent0);
@@ -909,7 +688,6 @@ private:
                     }
                 }
 
-                // ── Tangent 1 ──────────────────────────────────────────────
                 vRel = B->VelocityAt(c.WorldPointB) - A->VelocityAt(c.WorldPointA);
                 {
                     float emT = EffectiveMass(A, B, rA, rB, c.Tangent1);
@@ -926,15 +704,10 @@ private:
         }
     }
 
-    // Split-impulse position correction.
-    // Uses LOCAL contact coords to recompute lever arms after IntegratePositions
-    // has moved the bodies, eliminating stale-WorldPoint lever-arm error.
-    // MAX_COR raised from 0.02 → 0.2 m; with PositionIterations=3 passes
-    // up to 60 cm of separation can be resolved per sub-step, preventing tunneling.
     void SolveContactPositions() {
         const float ERP = 0.3f;
         const float SLOP = 0.005f;
-        const float MAX_COR = 0.2f;    // was 0.02 — caused tunneling on first contact
+        const float MAX_COR = 0.2f;
 
         for (auto& man : Contacts) {
             RigidBody* A = man.BodyA, * B = man.BodyB;
@@ -942,14 +715,11 @@ private:
                 float pen = c.Depth - SLOP;
                 if (pen <= 0.0f) continue;
 
-                // Recompute lever arms from LOCAL coords (valid after position integration)
                 glm::vec3 wA = A->LocalToWorld(c.LocalPointA);
                 glm::vec3 wB = B->LocalToWorld(c.LocalPointB);
                 glm::vec3 rA = wA - A->Position;
                 glm::vec3 rB = wB - B->Position;
 
-                // Also recompute actual penetration from updated positions
-                // (stored c.Depth may be stale after previous correction passes)
                 float actualPen = glm::dot(wB - wA, -man.Normal);
                 pen = actualPen - SLOP;
                 if (pen <= 0.0f) continue;

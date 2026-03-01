@@ -4,7 +4,6 @@ void Timer::Update(double now)
 {
     s_UnscaledDeltaTime = float(now - s_LastFrameTime);
 
-    // Protect against huge delta (pause / breakpoint)
     if (s_UnscaledDeltaTime > 0.25f)
         s_UnscaledDeltaTime = 0.25f;
 

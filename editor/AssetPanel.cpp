@@ -1,6 +1,5 @@
 #include "AssetPanel.h"
 
-// #include "EditorContext.h"
 #include "project/Project.h"
 #include "asset/AssetManager.h"
 #include "utils/FileDialog.h"
@@ -19,7 +18,6 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
     std::shared_ptr<AssetManager> assetManager = Project::GetActive()->GetAssetManager();
     auto registry = assetManager->GetAssetRegistry();
 
-    // search
     static char searchBuffer[128] = {};
     ImGui::PushItemWidth(-120.0f);
     ImGui::InputTextWithHint("##AssetSearch", "Search assets...", searchBuffer, sizeof(searchBuffer));
@@ -34,7 +32,6 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
 
     ImGui::Separator();
 
-    // tabs
     ImGui::BeginChild("AssetTabs", ImVec2(170, 0), true);
 
     if (ImGui::Selectable("Meshes", m_CurrentTab == AssetTab::Meshes))
@@ -50,7 +47,6 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
 
     ImGui::SameLine();
 
-    // asset grid
     ImGui::BeginChild("AssetGrid", ImVec2(0, 0), false);
 
     static float thumbnailSize = 72.0f;
@@ -84,17 +80,11 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
             { thumbnailSize, thumbnailSize }, { 0,1 }, { 1,0 });
         ImGui::PopStyleColor();
 
-        // -----------------------------------------------------------------
-        // Selection
-        // -----------------------------------------------------------------
         if (ImGui::IsItemClicked())
         {
             // TODO: EditorContext::SelectAsset(handle);
         }
 
-        // -----------------------------------------------------------------
-        // Drag & drop
-        // -----------------------------------------------------------------
         if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
         {
             ImGui::SetDragDropPayload(
@@ -106,9 +96,6 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
             ImGui::EndDragDropSource();
         }
 
-        // -----------------------------------------------------------------
-        // Context menu
-        // -----------------------------------------------------------------
         if (ImGui::BeginPopupContextItem())
         {
             ImGui::Text("%s", metadata.FilePath.filename().string().c_str());
@@ -141,10 +128,6 @@ void AssetPanel::Draw(std::shared_ptr<Scene> scene)
     ImGui::Columns(1);
 
     ImGui::EndChild();
-
-    // ---------------------------------------------------------------------
-    // Footer
-    // ---------------------------------------------------------------------
 
     ImGui::Separator();
     ImGui::SliderFloat("Thumbnail Size", &thumbnailSize, 32.0f, 128.0f);

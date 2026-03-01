@@ -46,9 +46,6 @@ void Application::Run()
 
         m_LayerStack.OnRender();
 
-        // std::cout << "FPS: " << Timer::FPS()
-        //     << "   Frame: " << Timer::AverageFrameTime() << "\n";
-
         m_Window->SwapBuffers();
     }
 

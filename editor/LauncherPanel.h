@@ -11,7 +11,6 @@ class LauncherPanel
 public:
     LauncherPanel(EditorSettings& settings);
 
-    // Returns a project path when user wants to open one
     std::optional<std::filesystem::path> Draw(const glm::ivec2& framebufferSize);
 
 private:

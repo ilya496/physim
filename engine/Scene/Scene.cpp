@@ -1,7 +1,6 @@
 #include "Scene.h"
 #include "Entity.h"
 
-// Scene lifecycle
 Scene::Scene() = default;
 Scene::~Scene() = default;
 
@@ -15,7 +14,6 @@ Entity Scene::CreateEntity(const std::string& name)
     m_Registry.emplace<TagComponent>(handle, name.empty() ? std::string("Entity") : name);
     // m_Registry.emplace<TransformComponent>(handle); // default transform
 
-    // Notify hooks if needed (optional; we already called emplace directly)
     OnComponentAdded<IDComponent>(entity, m_Registry.get<IDComponent>(handle));
     OnComponentAdded<TagComponent>(entity, m_Registry.get<TagComponent>(handle));
     // OnComponentAdded<TransformComponent>(entity, m_Registry.get<TransformComponent>(handle));
@@ -99,7 +97,6 @@ std::shared_ptr<Scene> Scene::Copy() const
 
     std::unordered_map<UUID, entt::entity> entityMap;
 
-    // 1. Create entities
     auto idView = m_Registry.view<IDComponent, TagComponent>();
     for (auto e : idView)
     {
@@ -110,7 +107,6 @@ std::shared_ptr<Scene> Scene::Copy() const
         entityMap[id.ID] = (entt::entity)newEntity;
     }
 
-    // 2. Copy components
     CopyComponents<
         TransformComponent,
         MeshRenderComponent,

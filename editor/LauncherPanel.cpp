@@ -32,7 +32,6 @@ std::optional<std::filesystem::path> LauncherPanel::Draw(const glm::ivec2& fb)
     ImGui::Separator();
     DrawFooter();
 
-    // Handle actions AFTER drawing
     if (m_RequestOpenFile)
     {
         auto path = FileDialog::OpenFile("Physim Project", "physim");

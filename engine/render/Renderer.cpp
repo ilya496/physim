@@ -57,7 +57,6 @@ static std::shared_ptr<Mesh> CreateWireSphere(int segments = 32)
 
     uint32_t index = 0;
 
-    // Create multiple latitude circles
     int latitudes = 8;
     for (int lat = 0; lat < latitudes; lat++)
     {
@@ -85,7 +84,6 @@ static std::shared_ptr<Mesh> CreateWireSphere(int segments = 32)
         }
     }
 
-    // Create longitude lines
     for (int lon = 0; lon < segments; lon++)
     {
         float theta = (float)lon / segments * glm::two_pi<float>();
@@ -434,7 +432,6 @@ void Renderer::CollectLights(Scene& scene)
         rl.Type = light.Type;
         rl.Range = light.Range;
 
-        // Directional lights use forward vector
         if (light.Type == LightType::Directional)
         {
             rl.Direction = glm::normalize(
@@ -448,7 +445,6 @@ void Renderer::CollectLights(Scene& scene)
 
         m_Lights.push_back(rl);
 
-        // Optional: cap max lights
         if (m_Lights.size() >= 32)
             break;
     }
@@ -503,7 +499,6 @@ std::shared_ptr<Mesh> Renderer::CreateGrid(
 
 void Renderer::RenderGrid()
 {
-    // Grid must NOT touch depth or stencil
     // glDisable(GL_DEPTH_TEST);
     // glDepthMask(GL_FALSE);
     glDisable(GL_STENCIL_TEST);
@@ -524,7 +519,6 @@ void Renderer::RenderGrid()
     m_GridShader->SetVec3f("u_Color", { 0.4f, 0.4f, 0.4f });
     m_GridMesh->DrawLines();
 
-    // Restore depth for rest of pipeline
     // glDepthMask(GL_TRUE);
     // glEnable(GL_DEPTH_TEST);
     glDisable(GL_BLEND);
@@ -544,14 +538,10 @@ void Renderer::RenderColliders(Scene& scene)
     m_GizmoShader->SetMat4f("u_View", m_Frame.View);
     m_GizmoShader->SetMat4f("u_Projection", m_Frame.Projection);
 
-    // to prevent z-fighting
     constexpr float offset = 1.005f;
 
     auto& registry = scene.GetRegistry();
 
-    // ----------------------------
-    // Box Colliders
-    // ----------------------------
     {
         auto view = registry.view<TransformComponent, BoxColliderComponent>();
 
@@ -570,9 +560,6 @@ void Renderer::RenderColliders(Scene& scene)
         }
     }
 
-    // ----------------------------
-    // Sphere Colliders
-    // ----------------------------
     {
         auto view = registry.view<TransformComponent, SphereColliderComponent>();
 
@@ -620,7 +607,6 @@ void Renderer::RenderDistanceJoints(Scene& scene)
         glm::vec3 worldB =
             trB.Translation + trB.Rotation * joint.LocalAnchorB;
 
-        // -------- Draw Rope Line --------
         {
             glm::vec3 diff = worldB - worldA;
             float length = glm::length(diff);
@@ -640,7 +626,6 @@ void Renderer::RenderDistanceJoints(Scene& scene)
             m_DebugLine->DrawLines();
         }
 
-        // -------- Draw Anchor A --------
         {
             glm::mat4 model =
                 glm::translate(glm::mat4(1.0f), worldA) *
@@ -651,7 +636,6 @@ void Renderer::RenderDistanceJoints(Scene& scene)
             m_DebugAnchorSphere->DrawLines();
         }
 
-        // -------- Draw Anchor B --------
         {
             glm::mat4 model =
                 glm::translate(glm::mat4(1.0f), worldB) *

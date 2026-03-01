@@ -65,7 +65,6 @@ void EditorLayer::OnAttach()
 
             if (frame >= m_ExportEndFrame)
             {
-                // Done — restore stopped state
                 m_SceneController.Stop();
                 m_ExportRunning = false;
                 m_ExportProgress = 1.0f;
@@ -73,7 +72,6 @@ void EditorLayer::OnAttach()
                 return;
             }
 
-            // Signal OnUpdate to advance one frame next tick
             m_PendingExportStep = true;
         }
     );
@@ -99,7 +97,6 @@ void EditorLayer::OnUpdate(float dt)
     if (m_PendingExportStep)
     {
         m_PendingExportStep = false;
-        // StepFrame only works when Paused, which is the state we set in StartExport
         m_SceneController.StepFrame(1);
         EventBus::Publish(RequestFrameCaptureEvent{ true });
     }
@@ -248,31 +245,28 @@ void EditorLayer::BeginDockspace()
 
 void EditorLayer::OpenProject(const std::filesystem::path& path)
 {
-    if (Project::Load(path))
+    bool success = false;
+
+    if (std::filesystem::exists(path))
+    {
+        success = Project::Load(path) ? true : false;
+    }
+    else
+    {
+        Project::New(path);
+        success = Project::SaveActive(path);
+    }
+
+    if (success)
     {
         std::string title = "Physim Editor";
         if (auto project = Project::GetActive())
             title += " - " + project->GetConfig().Name;
-
         m_Window->SetTitle(title.c_str());
-
         m_Settings.AddRecentProject(path);
         m_Settings.Save();
-
         m_State = EditorState::Editor;
     }
-}
-
-void EditorLayer::CreateNewProject()
-{
-    auto folder = FileDialog::SelectFolder("New Project");
-    if (folder.empty())
-        return;
-
-    auto project = Project::New();
-    Project::SaveActive(folder / "NewProject.physim");
-
-    m_State = EditorState::Editor;
 }
 
 void EditorLayer::DrawViewport()
@@ -654,15 +648,11 @@ void EditorLayer::StartExport()
     m_ExportProgress = 0.0f;
     m_PendingExportStep = false;
 
-    // Play then immediately pause — this puts the controller into Paused state.
-    // StepFrame only advances the frame when Paused, NOT when Stopped.
-    // This is the critical fix: Stop() was preventing StepFrame from working.
     m_SceneController.Stop();
     m_SceneController.SetFrame(0);
     m_SceneController.Play();
-    m_SceneController.TogglePause(); // now state == Paused, StepFrame will work
+    m_SceneController.TogglePause();
 
-    // Request capture of frame 0
     EventBus::Publish(RequestFrameCaptureEvent{ true });
 }
 

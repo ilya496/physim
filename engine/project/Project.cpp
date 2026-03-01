@@ -4,15 +4,34 @@
 #include "ProjectSerializer.h"
 #include "scene/SceneSerializer.h"
 #include <iostream>
+#include <fstream>
 
 std::filesystem::path Project::GetAssetAbsolutePath(const std::filesystem::path& path)
 {
     return GetAssetDirectory() / path;
 }
 
-std::shared_ptr<Project> Project::New()
+std::shared_ptr<Project> Project::New(const std::filesystem::path& path)
 {
     s_ActiveProject = std::make_shared<Project>();
+
+    auto projectDir = path.parent_path();
+    auto assetsDir = projectDir / "assets";
+    auto materialsDir = assetsDir / "materials";
+
+    std::filesystem::create_directories(assetsDir);
+    std::filesystem::create_directories(materialsDir);
+
+    {
+        std::ofstream file(assetsDir / "asset_registry.json");
+        file << "{\n  \"AssetRegistry\": []\n}\n";
+    }
+
+    {
+        std::ofstream file(assetsDir / "main.scene");
+        file << "{\n  \"Scene\": \"Untitled\",\n  \"Entities\": []\n}\n";
+    }
+    SaveActive(path);
     return s_ActiveProject;
 }
 

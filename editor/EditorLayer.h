@@ -43,7 +43,7 @@ private:
     void HandleSimulationShortcuts();
 
     void OpenProject(const std::filesystem::path& path);
-    void CreateNewProject();
+    // void CreateNewProject();
 
     void DrawExportPopup();
     void StartExport();

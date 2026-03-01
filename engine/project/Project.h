@@ -58,7 +58,7 @@ public:
     std::shared_ptr<Scene> GetActiveScene() { return m_ActiveScene; }
     void SetActiveScene(std::shared_ptr<Scene> scene) { m_ActiveScene = scene; }
 
-    static std::shared_ptr<Project> New();
+    static std::shared_ptr<Project> New(const std::filesystem::path& path);
     static std::shared_ptr<Project> Load(const std::filesystem::path& path);
     static bool SaveActive(const std::filesystem::path& path);
     static void Close();
