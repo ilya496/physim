@@ -8,4 +8,8 @@ add_executable(Physim
     SceneHierarchyPanel.cpp
 )
 
+target_compile_definitions(Physim PRIVATE
+    ICON_DIR="${CMAKE_SOURCE_DIR}/editor/icons/"
+)
+
 target_link_libraries(Physim PRIVATE engine)

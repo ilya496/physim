@@ -6,9 +6,9 @@
 
 AssetPanel::AssetPanel()
 {
-    m_MeshIcon = std::make_shared<Texture>("../editor/icons/mesh-icon.png");
-    m_TextureIcon = std::make_shared<Texture>("../editor/icons/texture-icon.png");
-    m_MaterialIcon = std::make_shared<Texture>("../editor/icons/material-icon.png");
+    m_MeshIcon = std::make_shared<Texture>(ICON_DIR "mesh-icon.png");
+    m_TextureIcon = std::make_shared<Texture>(ICON_DIR "texture-icon.png");
+    m_MaterialIcon = std::make_shared<Texture>(ICON_DIR "material-icon.png");
 }
 
 void AssetPanel::Draw(std::shared_ptr<Scene> scene)

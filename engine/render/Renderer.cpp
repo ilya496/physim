@@ -159,13 +159,13 @@ void Renderer::Init(const RenderTarget& target)
 
     m_Target = target;
 
-    m_ShadowShader = std::make_shared<Shader>("../engine/shaders/depth.vert", "../engine/shaders/depth.frag");
-    m_ForwardShader = std::make_shared<Shader>("../engine/shaders/forward.vert", "../engine/shaders/forward.frag");
-    m_OutlineShader = std::make_shared<Shader>("../engine/shaders/outline.vert", "../engine/shaders/outline.frag");
+    m_ShadowShader = std::make_shared<Shader>(SHADER_DIR "depth.vert", SHADER_DIR "depth.frag");
+    m_ForwardShader = std::make_shared<Shader>(SHADER_DIR "forward.vert", SHADER_DIR "forward.frag");
+    m_OutlineShader = std::make_shared<Shader>(SHADER_DIR "outline.vert", SHADER_DIR "outline.frag");
 
-    m_GizmoShader = std::make_shared<Shader>("../engine/shaders/gizmo.vert", "../engine/shaders/gizmo.frag");
+    m_GizmoShader = std::make_shared<Shader>(SHADER_DIR "gizmo.vert", SHADER_DIR "gizmo.frag");
 
-    m_GridShader = std::make_shared<Shader>("../engine/shaders/grid.vert", "../engine/shaders/grid.frag");
+    m_GridShader = std::make_shared<Shader>(SHADER_DIR "grid.vert", SHADER_DIR "grid.frag");
     m_GridMesh = CreateGrid(100, 1.0f);
     m_AxisX = CreateAxisMeshX(100.0f);
     m_AxisZ = CreateAxisMeshZ(100.0f);

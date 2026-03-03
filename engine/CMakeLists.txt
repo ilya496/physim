@@ -35,6 +35,10 @@ target_link_libraries(engine
         opengl32
 )
 
+target_compile_definitions(engine PRIVATE
+    SHADER_DIR="${CMAKE_SOURCE_DIR}/engine/shaders/"
+)
+
 target_include_directories(engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

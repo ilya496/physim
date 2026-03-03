@@ -39,7 +39,8 @@ void EditorLayer::OnAttach()
     ImGui_ImplGlfw_InitForOpenGL(m_Window->GetNativeWindow(), true);
     ImGui_ImplOpenGL3_Init("#version 460");
 
-    SetupImGuiFonts("../JetBrainsMono-Regular.ttf");
+    std::filesystem::path fontPath = std::filesystem::absolute(__FILE__).parent_path() / "JetBrainsMono-Regular.ttf";
+    SetupImGuiFonts(fontPath.string().c_str());
 
     m_Settings = EditorSettings::Load();
     m_LauncherPanel = std::make_unique<LauncherPanel>(m_Settings);
@@ -76,9 +77,9 @@ void EditorLayer::OnAttach()
         }
     );
 
-    m_PlayButtonIcon = Texture::Create("../editor/icons/play-button.png");
-    m_PauseButtonIcon = Texture::Create("../editor/icons/pause-button.png");
-    m_StopButtonIcon = Texture::Create("../editor/icons/stop-button.png");
+    m_PlayButtonIcon = Texture::Create(ICON_DIR "play-button.png");
+    m_PauseButtonIcon = Texture::Create(ICON_DIR "pause-button.png");
+    m_StopButtonIcon = Texture::Create(ICON_DIR "stop-button.png");
 }
 
 void EditorLayer::OnDetach()
@@ -542,6 +543,9 @@ void EditorLayer::HandleSimulationShortcuts()
 
         if (ImGui::IsKeyDown(ImGuiKey_RightArrow))
         {
+            if (ImGui::IsKeyPressed(ImGuiKey_RightArrow))
+                m_SceneController.StepFrame(1);
+
             rightArrowHeldTime += io.DeltaTime;
             if (rightArrowHeldTime >= HoldDelay &&
                 std::fmod(rightArrowHeldTime - HoldDelay, RepeatInterval) < io.DeltaTime)
@@ -551,6 +555,9 @@ void EditorLayer::HandleSimulationShortcuts()
 
         if (ImGui::IsKeyDown(ImGuiKey_LeftArrow))
         {
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
+                m_SceneController.StepFrame(-1);
+
             leftArrowHeldTime += io.DeltaTime;
             if (leftArrowHeldTime >= HoldDelay &&
                 std::fmod(leftArrowHeldTime - HoldDelay, RepeatInterval) < io.DeltaTime)
