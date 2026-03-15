@@ -7,6 +7,7 @@
 #include "core/Input.h"
 #include "EditorContext.h"
 #include <algorithm>
+#include "core/Timer.h"
 
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
@@ -486,10 +487,10 @@ void EditorLayer::DrawSimulationInfo(
     const int displayFrame = (totalFrames > 0) ? currentFrame : 0;
     const int displayTotal = (totalFrames > 0) ? totalFrames - 1 : 0;
 
-    char buffer[128];
+    char buffer[256];
     std::snprintf(buffer, sizeof(buffer),
-        "State: %s\nFrame: %d / %d",
-        stateStr, displayFrame, displayTotal);
+        "State: %s\nFrame: %d / %d\nFPS: %.1f",
+        stateStr, displayFrame, displayTotal, Timer::FPS());
 
     constexpr float OuterPadding = 10.0f;
     constexpr float InnerPaddingX = 8.0f;
